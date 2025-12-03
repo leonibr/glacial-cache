@@ -8,7 +8,7 @@ const documentation = [
     title: 'Getting Started',
     description:
       'Quick start guide with prerequisites, installation, and your first cache operations in ASP.NET Core.',
-    link: 'https://github.com/leonibr/frost-cache/tree/main/docs/getting-started.md',
+    link: 'https://github.com/leonibr/glacial-cache/tree/main/docs/getting-started.md',
     excerpt:
       'Install GlacialCache.PostgreSQL via NuGet, register it in Program.cs, and start using IDistributedCache for durable, cross-instance caching.',
   },
@@ -17,7 +17,7 @@ const documentation = [
     title: 'Core Concepts',
     description:
       'Understanding the data model, expiration behavior, cleanup strategy, and how GlacialCache compares to other solutions.',
-    link: 'https://github.com/leonibr/frost-cache/tree/main/docs/concepts.md',
+    link: 'https://github.com/leonibr/glacial-cache/tree/main/docs/concepts.md',
     excerpt:
       'Learn about absolute and sliding expiration, PostgreSQL schema design, automatic cleanup, and when to choose GlacialCache.',
   },
@@ -26,7 +26,7 @@ const documentation = [
     title: 'Configuration',
     description:
       'Complete reference for GlacialCachePostgreSQLOptions including connection, cache, maintenance, resilience, and Azure settings.',
-    link: 'https://github.com/leonibr/frost-cache/tree/main/docs/configuration.md',
+    link: 'https://github.com/leonibr/glacial-cache/tree/main/docs/configuration.md',
     excerpt:
       'Configure connection pooling, expiration defaults, cleanup intervals, retry policies, circuit breakers, and Azure Managed Identity.',
   },
@@ -35,7 +35,7 @@ const documentation = [
     title: 'Architecture',
     description:
       'System design internals covering components, request flow, background maintenance, and manager election.',
-    link: 'https://github.com/leonibr/frost-cache/tree/main/docs/architecture.md',
+    link: 'https://github.com/leonibr/glacial-cache/tree/main/docs/architecture.md',
     excerpt:
       'Deep dive into how GlacialCache handles connection pooling, resilience patterns, background cleanup, and multi-instance coordination.',
   },
@@ -44,7 +44,7 @@ const documentation = [
     title: 'Troubleshooting',
     description:
       'Common issues and solutions for connection problems, schema issues, performance tuning, and Azure diagnostics.',
-    link: 'https://github.com/leonibr/frost-cache/tree/main/docs/troubleshooting.md',
+    link: 'https://github.com/leonibr/glacial-cache/tree/main/docs/troubleshooting.md',
     excerpt:
       'Diagnose and fix connectivity issues, permission errors, cleanup problems, locking conflicts, and Azure Managed Identity challenges.',
   },
@@ -53,7 +53,7 @@ const documentation = [
     title: 'Examples',
     description:
       'Runnable code samples showing basic usage, advanced patterns, MemoryPack serialization, and Web API integration.',
-    link: 'https://github.com/leonibr/frost-cache/tree/main/examples',
+    link: 'https://github.com/leonibr/glacial-cache/tree/main/examples',
     excerpt:
       'Explore working examples including console apps, ASP.NET Core Web APIs, custom serializers, and Docker Compose setups.',
   },
@@ -331,12 +331,12 @@ function initCodeCopy() {
 
     // Show button on hover (with better hover handling)
     let hideTimeout;
-    
+
     const showButton = () => {
       clearTimeout(hideTimeout);
       copyButton.style.opacity = '1';
     };
-    
+
     const hideButton = () => {
       clearTimeout(hideTimeout);
       hideTimeout = setTimeout(() => {
@@ -345,7 +345,7 @@ function initCodeCopy() {
         }
       }, 300);
     };
-    
+
     block.addEventListener('mouseenter', showButton);
     block.addEventListener('mouseleave', hideButton);
     copyButton.addEventListener('mouseenter', showButton);
@@ -399,7 +399,7 @@ function initMobileMenu() {
 async function fetchGitHubReleases() {
   try {
     const response = await fetch(
-      'https://api.github.com/repos/leonibr/frost-cache/releases'
+      'https://api.github.com/repos/leonibr/glacial-cache/releases'
     );
     if (!response.ok) throw new Error('Failed to fetch releases');
 

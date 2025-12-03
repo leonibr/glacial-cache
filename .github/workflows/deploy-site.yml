@@ -14,10 +14,15 @@ jobs:
         runs-on: ubuntu-latest
         permissions:
             contents: write
+            pages: write
+            id-token: write
 
         steps:
             - name: Checkout repository
               uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  token: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Setup Node.js
               uses: actions/setup-node@v4
@@ -63,9 +68,10 @@ jobs:
                   cp _headers dist/
 
             - name: Add CNAME file for custom domain (if configured)
-              if: secrets.CUSTOM_DOMAIN != ''
               run: |
-                  echo "${{ secrets.CUSTOM_DOMAIN }}" > docs/site/dist/CNAME
+                  if [ -n "${{ secrets.CUSTOM_DOMAIN }}" ]; then
+                    echo "${{ secrets.CUSTOM_DOMAIN }}" > docs/site/dist/CNAME
+                  fi
 
             - name: Deploy to GitHub Pages
               uses: peaceiris/actions-gh-pages@v4

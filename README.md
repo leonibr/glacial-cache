@@ -9,13 +9,13 @@
   &nbsp;•&nbsp;
   <a href="examples"><strong>💡 Runnable Examples</strong></a>
   &nbsp;•&nbsp;
-  <a href="https://github.com/leonibr/frost-cache/stargazers"><strong>⭐ Star on GitHub</strong></a>
+  <a href="https://github.com/leonibr/glacial-cache/stargazers"><strong>⭐ Star on GitHub</strong></a>
 </p>
 
 <p>
   <!-- Badges use placeholder values; update once published/configured -->
   <img alt="NuGet" src="https://img.shields.io/nuget/v/GlacialCache.PostgreSQL.svg?label=NuGet&style=for-the-badge">
-  <a href="https://github.com/leonibr/frost-cache/actions/workflows/build-and-deploy.yml"><img alt="Build and Deploy" src="https://img.shields.io/github/actions/workflow/status/leonibr/frost-cache/build-and-deploy.yml?style=for-the-badge&label=Build"></a>
+  <a href="https://github.com/leonibr/glacial-cache/actions/workflows/build-and-deploy.yml"><img alt="Build and Deploy" src="https://img.shields.io/github/actions/workflow/status/leonibr/glacial-cache/build-and-deploy.yml?style=for-the-badge&label=Build"></a>
   <img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge">
   <img alt=".NET versions" src="https://img.shields.io/badge/.NET-8.0%20%7C%209.0%20%7C%2010.0-512BD4?style=for-the-badge">
 </p>

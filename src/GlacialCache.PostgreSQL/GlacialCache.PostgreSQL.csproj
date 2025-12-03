@@ -12,8 +12,8 @@
     <PackageTags>cache;distributed;postgresql;dotnet</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
-    <RepositoryUrl>https://github.com/leonibr/frost-cache</RepositoryUrl>
-    <PackageProjectUrl>https://github.com/leonibr/frost-cache</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/leonibr/glacial-cache</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/leonibr/glacial-cache</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 

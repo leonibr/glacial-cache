@@ -1,0 +1,70 @@
+# Headers Configuration for GitHub Pages / Cloudflare
+
+# Security and Privacy Headers (applied to all paths)
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  X-XSS-Protection: 1; mode=block
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(), camera=()
+  # Cache HTML for short time to allow updates
+  Cache-Control: public, max-age=3600, must-revalidate
+  # Instruct CDN not to set cookies for static content
+  CDN-Cache-Control: public, max-age=31536000, immutable
+  
+# Cache static assets aggressively
+/styles.css
+  Cache-Control: public, max-age=31536000, immutable
+  CDN-Cache-Control: public, max-age=31536000, immutable
+
+/styles.min.css
+  Cache-Control: public, max-age=31536000, immutable
+  CDN-Cache-Control: public, max-age=31536000, immutable
+
+/main.js
+  Cache-Control: public, max-age=31536000, immutable
+  CDN-Cache-Control: public, max-age=31536000, immutable
+
+/main.min.js
+  Cache-Control: public, max-age=31536000, immutable
+  CDN-Cache-Control: public, max-age=31536000, immutable
+
+# Cache images
+/*.png
+  Cache-Control: public, max-age=31536000, immutable
+  CDN-Cache-Control: public, max-age=31536000, immutable
+
+/*.jpg
+  Cache-Control: public, max-age=31536000, immutable
+  CDN-Cache-Control: public, max-age=31536000, immutable
+
+/*.jpeg
+  Cache-Control: public, max-age=31536000, immutable
+  CDN-Cache-Control: public, max-age=31536000, immutable
+
+/*.webp
+  Cache-Control: public, max-age=31536000, immutable
+  CDN-Cache-Control: public, max-age=31536000, immutable
+
+/*.svg
+  Cache-Control: public, max-age=31536000, immutable
+  CDN-Cache-Control: public, max-age=31536000, immutable
+
+/*.ico
+  Cache-Control: public, max-age=31536000, immutable
+  CDN-Cache-Control: public, max-age=31536000, immutable
+
+# Cache manifest and other static files
+/site.webmanifest
+  Cache-Control: public, max-age=604800
+  CDN-Cache-Control: public, max-age=604800
+  Content-Type: application/manifest+json
+
+/robots.txt
+  Cache-Control: public, max-age=86400
+  CDN-Cache-Control: public, max-age=86400
+
+/sitemap.xml
+  Cache-Control: public, max-age=86400
+  CDN-Cache-Control: public, max-age=86400
+

@@ -1,0 +1,183 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="GlacialCache.PostgreSQL - PostgreSQL-backed distributed caching for .NET. Reuse your existing database for durable, cross-instance caching without additional infrastructure."><meta name="keywords" content="caching, .NET, PostgreSQL, distributed cache, IDistributedCache, ASP.NET Core"><meta name="author" content="GlacialCache"><meta property="og:title" content="GlacialCache.PostgreSQL - Distributed Caching for .NET"><meta property="og:description" content="PostgreSQL-backed distributed caching for .NET. Reuse your existing database for durable, cross-instance caching without additional infrastructure."><meta property="og:type" content="website"><meta property="og:url" content="https://github.com/leonibr/frost-cache"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="GlacialCache.PostgreSQL - Distributed Caching for .NET"><meta name="twitter:description" content="PostgreSQL-backed distributed caching for .NET. Reuse your existing database for durable, cross-instance caching."><title>GlacialCache.PostgreSQL - PostgreSQL-backed Distributed Caching for .NET</title><link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="shortcut icon" href="/favicon.ico"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="manifest" href="/site.webmanifest"><meta name="theme-color" content="#2563eb"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous"><link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github-dark.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer"><script type="application/ld+json">{
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "GlacialCache.PostgreSQL",
+        "applicationCategory": "DeveloperApplication",
+        "description": "PostgreSQL-backed distributed caching for .NET",
+        "operatingSystem": ".NET 8.0, 9.0, 10.0",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "author": {
+          "@type": "Organization",
+          "name": "GlacialCache"
+        }
+      }</script></head><body><header class="header"><nav class="navbar navbar-expand-lg"><div class="container"><a class="navbar-brand logo d-flex align-items-center" href="#"><span class="logo-icon"><i class="fas fa-snowflake"></i></span> <span class="logo-text">GlacialCache</span> </a><button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button><div class="collapse navbar-collapse" id="navbarNav"><ul class="navbar-nav ms-auto align-items-center"><li class="nav-item"><a href="#features" class="nav-link">Features</a></li><li class="nav-item"><a href="#quickstart" class="nav-link">Quick Start</a></li><li class="nav-item"><a href="#documentation" class="nav-link">Documentation</a></li><li class="nav-item"><a href="#releases" class="nav-link">What's New</a></li><li class="nav-item"><a href="https://github.com/leonibr/frost-cache" class="btn btn-secondary ms-lg-2 mt-2 mt-lg-0" target="_blank" rel="noopener"><i class="fab fa-github me-2"></i>GitHub</a></li></ul></div></div></nav></header><section class="hero"><div class="container"><div class="hero-content text-center"><h1 class="hero-title mb-4">PostgreSQL-backed Distributed Caching for .NET</h1><p class="hero-subtitle mb-5">Reuse the database you already trust to get durable, cross-instance caching without adding new infrastructure</p><div class="badges d-flex justify-content-center flex-wrap gap-3 mb-5"><a href="https://www.nuget.org/packages/GlacialCache.PostgreSQL" target="_blank" rel="noopener"><img src="https://img.shields.io/nuget/v/GlacialCache.PostgreSQL.svg?label=NuGet&style=for-the-badge" alt="NuGet Version" loading="lazy"> </a><a href="https://github.com/leonibr/frost-cache/actions/workflows/build-and-deploy.yml" target="_blank" rel="noopener"><img src="https://img.shields.io/github/actions/workflow/status/leonibr/frost-cache/build-and-deploy.yml?style=for-the-badge&label=Build" alt="Build Status" loading="lazy"> </a><a href="https://github.com/leonibr/frost-cache/stargazers" target="_blank" rel="noopener"><img src="https://img.shields.io/github/stars/leonibr/frost-cache?style=for-the-badge" alt="GitHub Stars" loading="lazy"> </a><a href="https://github.com/leonibr/frost-cache/blob/main/LICENSE" target="_blank" rel="noopener"><img src="https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge" alt="MIT License" loading="lazy"> </a><img src="https://img.shields.io/badge/.NET-8.0%20%7C%209.0%20%7C%2010.0-512BD4?style=for-the-badge" alt=".NET Versions" loading="lazy"></div><div class="hero-legacy-badge d-flex align-items-center justify-content-center mb-5 p-3"><span class="legacy-icon"><i class="fas fa-sparkles"></i></span> <span class="legacy-text">From the maintainer of <a href="https://github.com/leonibr/community-extensions-cache-postgres" target="_blank" rel="noopener" class="legacy-link">Extensions.Caching.PostgreSql</a> <span class="legacy-downloads"><i class="fas fa-download me-1"></i>(900K+ downloads)</span></span></div><div class="hero-cta d-flex justify-content-center flex-wrap gap-3 mb-5"><a href="#quickstart" class="btn btn-primary btn-large"><i class="fas fa-rocket me-2"></i>Get Started</a> <a href="https://github.com/leonibr/frost-cache" class="btn btn-secondary btn-large" target="_blank" rel="noopener"><i class="fab fa-github me-2"></i>View on GitHub</a></div><div class="hero-carousel swiper"><div class="swiper-wrapper"><div class="swiper-slide"><div class="hero-carousel-slide"><h3 class="carousel-slide-title">Flexible Serialization</h3><p class="carousel-slide-description">Choose MemoryPack for performance, JSON for compatibility, or implement custom serializers</p><div class="code-block"><pre><code class="language-csharp">// MemoryPack (Default - High Performance)
+builder.Services.AddGlacialCachePostgreSQL(options => {
+    options.Cache.Serializer = SerializerType.MemoryPack;
+});
+
+// Or JSON for compatibility
+options.Cache.Serializer = SerializerType.JsonBytes;</code></pre></div></div></div><div class="swiper-slide"><div class="hero-carousel-slide"><h3 class="carousel-slide-title">Powerful Batch Operations</h3><p class="carousel-slide-description">Reduce latency with GetMultipleAsync and SetMultipleAsync in a single round-trip</p><div class="code-block"><pre><code class="language-csharp">// Batch GET - Single database round-trip
+var keys = new[] { "product:1", "product:2", "product:3" };
+var results = await cache.GetMultipleAsync(keys);
+
+// Batch SET - Efficient bulk insertion
+await cache.SetMultipleAsync(entries);</code></pre></div></div></div><div class="swiper-slide"><div class="hero-carousel-slide"><h3 class="carousel-slide-title">Type-Safe APIs</h3><p class="carousel-slide-description">Generic GetEntryAsync&lt;T&gt; and SetEntryAsync&lt;T&gt; with automatic serialization</p><div class="code-block"><pre><code class="language-csharp">// Typed GET with automatic deserialization
+var entry = await cache.GetEntryAsync&lt;User&gt;("user:123");
+
+// Typed SET with automatic serialization
+await cache.SetEntryAsync("user:123", user, options);</code></pre></div></div></div></div><div class="swiper-pagination"></div><div class="swiper-button-prev"></div><div class="swiper-button-next"></div></div></div></div></section><section class="social-proof"><div class="container"><p class="social-proof-title text-center m-0">Trusted by developers building production-ready .NET applications</p></div></section><section class="evolution-section"><div class="container"><h2 class="section-title text-center mb-4">Built on Proven Foundations</h2><div class="evolution-content"><div class="row evolution-stats"><div class="col-lg-4 col-md-4 mb-4 d-flex"><div class="stat-card h-100"><div class="stat-number">900K+</div><div class="stat-label">Downloads</div></div></div><div class="col-lg-4 col-md-4 mb-4"><div class="stat-card"><div class="stat-number">6+</div><div class="stat-label">Years Maintained</div></div></div><div class="col-lg-4 col-md-4 mb-4 d-flex"><div class="stat-card h-100"><div class="stat-number">20+</div><div class="stat-label">Releases</div></div></div></div><div class="evolution-story"><p class="evolution-paragraph">GlacialCache is the modern evolution of <a href="https://github.com/leonibr/community-extensions-cache-postgres" target="_blank" rel="noopener" class="evolution-link">Extensions.Caching.PostgreSql</a>, a battle-tested PostgreSQL caching library trusted by hundreds of thousands of developers and production applications since 2019.</p><p class="evolution-paragraph">After years of maintaining the original library and gathering feedback from the community, we built GlacialCache from the ground up to address modern .NET requirements and deliver the features developers requested most.</p><div class="evolution-improvements"><h3 class="improvements-title">What's New in GlacialCache</h3><ul class="improvements-list"><li><strong>Advanced Serialization:</strong> MemoryPack for blazing-fast performance, JSON for compatibility, or custom serializers</li><li><strong>Batch Operations:</strong> GetMultipleAsync and SetMultipleAsync for efficient multi-key operations</li><li><strong>Type-Safe APIs:</strong> Generic GetEntryAsync&lt;T&gt; and SetEntryAsync&lt;T&gt; with automatic serialization</li><li><strong>Enterprise Features:</strong> Azure Managed Identity, advanced resilience patterns, and rich diagnostics</li><li><strong>Modern .NET:</strong> Built for .NET 8, 9, and 10 with async-first design</li></ul></div><div class="evolution-migration"><p class="migration-note"><strong><i class="fas fa-box me-2"></i>Migrating from Extensions.Caching.PostgreSql?</strong> GlacialCache maintains full IDistributedCache compatibility. Simply swap the package and registration—your existing code continues to work!</p></div></div></div></div></section><section class="features" id="features"><div class="container"><h2 class="section-title text-center mb-4">Why Choose GlacialCache?</h2><p class="section-subtitle text-center mx-auto mb-5">Skip the complexity of managing separate caching infrastructure</p><div class="row feature-grid"><div class="col-lg-4 col-md-6 mb-4 d-flex"><div class="feature-card h-100"><h3 class="feature-title"><span class="feature-icon"><i class="fas fa-database"></i></span> Reuse PostgreSQL, Skip New Infrastructure</h3><p class="feature-description">No Redis cluster to deploy or operate. GlacialCache leverages the PostgreSQL you already run, saving you operational overhead and costs.</p></div></div><div class="col-lg-4 col-md-6 mb-4 d-flex"><div class="feature-card h-100"><h3 class="feature-title"><span class="feature-icon"><i class="fas fa-plug"></i></span> Drop-in IDistributedCache</h3><p class="feature-description">Works seamlessly with standard ASP.NET Core patterns. Full IDistributedCache implementation for PostgreSQL—just swap the registration and your existing code works instantly.</p></div></div><div class="col-lg-4 col-md-6 mb-4 d-flex"><div class="feature-card h-100"><h3 class="feature-title"><span class="feature-icon"><i class="fas fa-bullseye"></i></span> Flexible Serialization Options</h3><p class="feature-description">Choose MemoryPack for maximum performance, System.Text.Json for compatibility, or implement your own ICacheEntrySerializer for custom needs. Strings and byte arrays are always optimized.</p></div></div><div class="col-lg-4 col-md-6 mb-4 d-flex"><div class="feature-card h-100"><h3 class="feature-title"><span class="feature-icon"><i class="fas fa-boxes"></i></span> Powerful Batch Operations</h3><p class="feature-description">GetMultipleAsync and SetMultipleAsync enable efficient bulk operations in a single database round-trip. Dramatically reduce latency for multi-key scenarios.</p></div></div><div class="col-lg-4 col-md-6 mb-4 d-flex"><div class="feature-card h-100"><h3 class="feature-title"><span class="feature-icon"><i class="fas fa-code"></i></span> Typed Sugar Methods</h3><p class="feature-description">Generic GetEntryAsync&lt;T&gt; and SetEntryAsync&lt;T&gt; provide automatic serialization/deserialization with full type safety. No more manual JSON conversion boilerplate.</p></div></div><div class="col-lg-4 col-md-6 mb-4 d-flex"><div class="feature-card h-100"><h3 class="feature-title"><span class="feature-icon"><i class="fas fa-hdd"></i></span> Durable, Cross-Instance Cache</h3><p class="feature-description">Cache entries are stored in PostgreSQL and shared across all app instances, surviving restarts and deployments with automatic expiration handling.</p></div></div><div class="col-lg-4 col-md-6 mb-4 d-flex"><div class="feature-card h-100"><h3 class="feature-title"><span class="feature-icon"><i class="fas fa-bolt"></i></span> Production-Ready Performance</h3><p class="feature-description">Async-first with Npgsql connection pooling, optimized SQL, and efficient storage of strings, bytes, and complex objects.</p></div></div><div class="col-lg-4 col-md-6 mb-4 d-flex"><div class="feature-card h-100"><h3 class="feature-title"><span class="feature-icon"><i class="fas fa-shield-alt"></i></span> Built for Reliability</h3><p class="feature-description">Background cleanup, manager election, resilience policies, and structured logging are included from day one.</p></div></div><div class="col-lg-4 col-md-6 mb-4 d-flex"><div class="feature-card h-100"><h3 class="feature-title"><span class="feature-icon"><i class="fas fa-cloud"></i></span> Cloud-Native & Enterprise</h3><p class="feature-description">Azure Managed Identity support for passwordless connections, rich logging, and configurable timeouts for production workloads.</p></div></div></div></div></section><section class="quickstart" id="quickstart"><div class="container"><h2 class="section-title text-center mb-5">Get Started in 3 Simple Steps</h2><div class="steps"><div class="step"><div class="step-number">1</div><div class="step-content"><h3 class="step-title">Install the Package</h3><div class="code-block"><pre><code class="language-csharp">dotnet add package GlacialCache.PostgreSQL</code></pre></div></div></div><div class="step"><div class="step-number">2</div><div class="step-content"><h3 class="step-title">Register in Program.cs</h3><div class="code-block"><pre><code class="language-csharp">using GlacialCache.PostgreSQL;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddGlacialCachePostgreSQL(
+    "Host=localhost;Database=myapp;Username=postgres;Password=mypassword");
+
+var app = builder.Build();</code></pre></div></div></div><div class="step"><div class="step-number">3</div><div class="step-content"><h3 class="step-title">Use IDistributedCache</h3><div class="code-block"><pre><code class="language-csharp">public class ProductService
+{
+    private readonly IDistributedCache _cache;
+
+    public async Task&lt;Product?&gt; GetProductAsync(int id)
+    {
+        var key = $"product:{id}";
+        var cached = await _cache.GetStringAsync(key);
+        
+        if (cached is not null)
+            return JsonSerializer.Deserialize&lt;Product&gt;(cached);
+
+        var product = await _repository.GetProductAsync(id);
+        await _cache.SetStringAsync(key, JsonSerializer.Serialize(product));
+        
+        return product;
+    }
+}</code></pre></div></div></div><div class="step"><div class="step-number">4</div><div class="step-content"><h3 class="step-title">Unlock Advanced Features</h3><div class="code-block"><pre><code class="language-csharp">// Batch operations for efficiency
+var keys = new[] { "product:1", "product:2", "product:3" };
+var results = await cache.GetMultipleAsync(keys);
+
+// Typed operations with automatic serialization
+await cache.SetEntryAsync("user:123", user, new() { 
+    SlidingExpiration = TimeSpan.FromMinutes(30) 
+});
+var cachedUser = await cache.GetEntryAsync&lt;User&gt;("user:123");
+
+// Configure serialization (MemoryPack, JSON, or Custom)
+builder.Services.AddGlacialCachePostgreSQL(options => {
+    options.Cache.Serializer = SerializerType.JsonBytes;
+});</code></pre></div></div></div></div><div class="quickstart-cta"><a href="https://github.com/leonibr/frost-cache/tree/main/docs/getting-started.md" class="btn btn-primary" target="_blank" rel="noopener"><i class="fas fa-book-open me-2"></i>View Full Getting Started Guide</a></div></div></section><section class="advanced-features"><div class="container"><h2 class="section-title">Advanced Features</h2><p class="section-subtitle">Go beyond standard caching with powerful serialization, batch operations, and type-safe APIs</p><div class="tabs"><div class="tab-buttons" role="tablist"><button class="tab-button active" role="tab" data-tab="serialization" aria-selected="true">Serialization Options</button> <button class="tab-button" role="tab" data-tab="batch">Batch Operations</button> <button class="tab-button" role="tab" data-tab="typed">Typed Operations</button></div><div class="tab-content"><div class="tab-panel active" id="tab-serialization" role="tabpanel"><h3 class="tab-panel-title">Flexible Serialization</h3><p class="tab-panel-description">Choose the serialization strategy that fits your needs: high-performance MemoryPack (default), standards-based System.Text.Json, or implement your own custom serializer.</p><div class="code-block"><pre><code class="language-csharp">// Option 1: MemoryPack (Default - Highest Performance)
+builder.Services.AddGlacialCachePostgreSQL(options => {
+    options.Connection.ConnectionString = connectionString;
+    options.Cache.Serializer = SerializerType.MemoryPack; // Default
+});
+
+// Option 2: JSON with System.Text.Json (Microsoft)
+builder.Services.AddGlacialCachePostgreSQL(options => {
+    options.Connection.ConnectionString = connectionString;
+    options.Cache.Serializer = SerializerType.JsonBytes;
+});
+
+// Option 3: Custom Serializer
+public class MyCustomSerializer : ICacheEntrySerializer
+{
+    public byte[] Serialize&lt;T&gt;(T value) where T : notnull
+    {
+        // Your custom serialization logic
+    }
+    
+    public T Deserialize&lt;T&gt;(byte[] data) where T : notnull
+    {
+        // Your custom deserialization logic
+    }
+}
+
+builder.Services.AddGlacialCachePostgreSQL(options => {
+    options.Cache.Serializer = SerializerType.Custom;
+    options.Cache.CustomSerializerType = typeof(MyCustomSerializer);
+});
+
+// Note: Strings and byte arrays are always optimized regardless of serializer</code></pre></div></div><div class="tab-panel" id="tab-batch" role="tabpanel"><h3 class="tab-panel-title">Batch Operations</h3><p class="tab-panel-description">Dramatically reduce database round-trips by fetching or setting multiple cache entries in a single operation. Perfect for high-throughput scenarios.</p><div class="code-block"><pre><code class="language-csharp">// Inject IGlacialCache (extends IDistributedCache)
+public class ProductService
+{
+    private readonly IGlacialCache _cache;
+    
+    public ProductService(IGlacialCache cache) => _cache = cache;
+
+    // Batch GET - Single database round-trip for multiple keys
+    public async Task&lt;List&lt;Product&gt;&gt; GetProductsAsync(int[] ids)
+    {
+        var keys = ids.Select(id => $"product:{id}");
+        var results = await _cache.GetMultipleAsync(keys);
+        
+        return results.Values
+            .Where(v => v != null)
+            .Select(v => JsonSerializer.Deserialize&lt;Product&gt;(v))
+            .ToList();
+    }
+
+    // Batch SET - Efficient bulk insertion
+    public async Task CacheProductsAsync(List&lt;Product&gt; products)
+    {
+        var entries = products.ToDictionary(
+            p => $"product:{p.Id}",
+            p => (
+                value: Encoding.UTF8.GetBytes(JsonSerializer.Serialize(p)),
+                options: new DistributedCacheEntryOptions {
+                    SlidingExpiration = TimeSpan.FromMinutes(30)
+                }
+            )
+        );
+        
+        await _cache.SetMultipleAsync(entries);
+    }
+
+    // Also available: RemoveMultipleAsync, RefreshMultipleAsync
+}</code></pre></div></div><div class="tab-panel" id="tab-typed" role="tabpanel"><h3 class="tab-panel-title">Typed Operations</h3><p class="tab-panel-description">Skip manual serialization with generic methods that handle type conversion automatically. Full type safety with IntelliSense support.</p><div class="code-block"><pre><code class="language-csharp">// Inject IGlacialCache for advanced features
+public class UserService
+{
+    private readonly IGlacialCache _cache;
+    
+    public UserService(IGlacialCache cache) => _cache = cache;
+
+    // Typed GET with automatic deserialization
+    public async Task&lt;User?&gt; GetUserAsync(int userId)
+    {
+        var entry = await _cache.GetEntryAsync&lt;User&gt;($"user:{userId}");
+        return entry?.Value; // Strongly typed!
+    }
+
+    // Typed SET with automatic serialization
+    public async Task CacheUserAsync(User user)
+    {
+        await _cache.SetEntryAsync($"user:{user.Id}", user, new() {
+            SlidingExpiration = TimeSpan.FromMinutes(30),
+            AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(2)
+        });
+    }
+
+    // Batch typed operations
+    public async Task&lt;List&lt;User&gt;&gt; GetUsersAsync(int[] userIds)
+    {
+        var keys = userIds.Select(id => $"user:{id}");
+        var entries = await _cache.GetMultipleEntriesAsync&lt;User&gt;(keys);
+        
+        return entries.Values
+            .Where(e => e?.Value != null)
+            .Select(e => e.Value)
+            .ToList();
+    }
+
+    // Set multiple typed entries
+    public async Task CacheUsersAsync(List&lt;User&gt; users)
+    {
+        var entries = users.ToDictionary(
+            u => $"user:{u.Id}",
+            u => (value: u, options: (DistributedCacheEntryOptions?)new() {
+                SlidingExpiration = TimeSpan.FromMinutes(30)
+            })
+        );
+        
+        await _cache.SetMultipleEntriesAsync(entries);
+    }
+}</code></pre></div></div></div></div></div></section><section class="comparison"><div class="container"><h2 class="section-title text-center mb-4">How Does GlacialCache Compare?</h2><div class="comparison-table-wrapper table-responsive"><table class="comparison-table table table-hover"><thead><tr><th>Feature</th><th class="center">GlacialCache.PostgreSQL</th><th class="center">IMemoryCache</th><th class="center">Redis-based Cache</th></tr></thead><tbody><tr><td>Storage Location</td><td class="center">PostgreSQL table</td><td class="center">Application memory</td><td class="center">Dedicated Redis instance</td></tr><tr><td>Shared Across Instances</td><td class="center"><span class="check"><i class="fas fa-check-circle fa-2x"></i></span></td><td class="center"><span class="cross"><i class="fas fa-times-circle fa-2x"></i></span></td><td class="center"><span class="check"><i class="fas fa-check-circle fa-2x"></i></span></td></tr><tr><td>Survives Restarts</td><td class="center"><span class="check"><i class="fas fa-check-circle fa-2x"></i></span></td><td class="center"><span class="cross"><i class="fas fa-times-circle fa-2x"></i></span></td><td class="center"><span class="warning"><i class="fas fa-exclamation-triangle fa-2x"></i></span> <span class="text-muted" style="font-size:.7em"><br><i>(Depends on config)</i></span></td></tr><tr><td><b>NO</b> Extra Infrastructure</td><td class="center"><span class="check"><i class="fas fa-times-circle fa-2x"></i></span> <span class="text-muted" style="font-size:.7em"><br><i>(uses existing PostgreSQL instance)</i></span></td><td class="center"><span class="check"><i class="fas fa-times-circle fa-2x"></i></span></td><td class="center"><span class="cross"><i class="fas fa-check-circle fa-2x"></i></span> <span class="text-muted" style="font-size:.7em"><br><i>(Redis server)</i></span></td></tr><tr><td>Operational Complexity</td><td class="center">Low (reuses DB)</td><td class="center">Low</td><td class="center">Medium-High</td></tr><tr><td>Best When...</td><td class="center">You run PostgreSQL & want durable caching</td><td class="center">Single-instance or ephemeral</td><td class="center">Ultra-high throughput needed</td></tr></tbody></table></div></div></section><section class="documentation" id="documentation"><div class="container"><h2 class="section-title text-center mb-4">Documentation</h2><p class="section-subtitle text-center mx-auto mb-4">Everything you need to get from installation to production tuning</p><div class="row doc-grid" id="doc-content"></div><div class="doc-cta"><a href="https://github.com/leonibr/frost-cache/tree/main/docs" class="btn btn-primary" target="_blank" rel="noopener"><i class="fas fa-book me-2"></i>View Full Documentation</a></div></div></section><section class="releases" id="releases"><div class="container"><h2 class="section-title">What's New</h2><p class="section-subtitle">Latest updates and release notes</p><div class="releases-content" id="releases-content"></div><div class="releases-cta"><a href="https://github.com/leonibr/frost-cache/releases" class="btn btn-secondary" target="_blank" rel="noopener"><i class="fab fa-github me-2"></i>View All Releases on GitHub</a></div></div></section><section class="cta-section"><div class="container"><div class="cta-content"><h2 class="cta-title">Ready to Simplify Your Caching?</h2><p class="cta-subtitle">Join developers who are leveraging PostgreSQL for distributed caching</p><div class="cta-buttons d-flex justify-content-center flex-wrap gap-3"><a href="#quickstart" class="btn btn-primary btn-large"><i class="fas fa-rocket me-2"></i>Get Started Now</a> <a href="https://www.nuget.org/packages/GlacialCache.PostgreSQL" class="btn btn-secondary btn-large" target="_blank" rel="noopener"><i class="fas fa-download me-2"></i>Install from NuGet</a></div></div></div></section><footer class="footer"><div class="container"><div class="row footer-content"><div class="col-lg-3 col-md-6 mb-4"><div class="footer-section"><h3 class="footer-title"><span class="logo-icon"><i class="fas fa-snowflake"></i></span> GlacialCache</h3><p class="footer-description">PostgreSQL-backed distributed caching for .NET</p></div></div><div class="col-lg-3 col-md-6 mb-4"><div class="footer-section"><h4 class="footer-heading">Resources</h4><ul class="footer-links"><li><a href="https://github.com/leonibr/frost-cache/tree/main/docs/getting-started.md" target="_blank" rel="noopener">Getting Started</a></li><li><a href="https://github.com/leonibr/frost-cache/tree/main/docs" target="_blank" rel="noopener">Documentation</a></li><li><a href="https://github.com/leonibr/frost-cache/tree/main/examples" target="_blank" rel="noopener">Examples</a></li><li><a href="https://github.com/leonibr/frost-cache/tree/main/src/GlacialCache.Benchmarks" target="_blank" rel="noopener">Benchmarks</a></li></ul></div></div><div class="col-lg-3 col-md-6 mb-4"><div class="footer-section"><h4 class="footer-heading">Community</h4><ul class="footer-links"><li><a href="https://github.com/leonibr/frost-cache" target="_blank" rel="noopener">GitHub Repository</a></li><li><a href="https://github.com/leonibr/frost-cache/issues" target="_blank" rel="noopener">Issue Tracker</a></li><li><a href="https://github.com/leonibr/frost-cache/discussions" target="_blank" rel="noopener">Discussions</a></li><li><a href="https://github.com/leonibr/frost-cache/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li></ul></div></div><div class="col-lg-3 col-md-6 mb-4"><div class="footer-section"><h4 class="footer-heading">Package</h4><ul class="footer-links"><li><a href="https://www.nuget.org/packages/GlacialCache.PostgreSQL" target="_blank" rel="noopener">NuGet Package</a></li><li><a href="https://github.com/leonibr/frost-cache/releases" target="_blank" rel="noopener">Release Notes</a></li></ul></div></div></div><div class="footer-bottom"><p>&copy; 2025 GlacialCache. Licensed under the MIT License.</p><p><a href="https://github.com/leonibr/frost-cache" target="_blank" rel="noopener"><i class="fab fa-github me-2"></i>Star on GitHub</a></p></div></div></footer><script defer="defer" src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script><script defer="defer" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script><script defer="defer" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/csharp.min.js"></script><script defer="defer" src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script><script defer="defer" src="main.js"></script></body></html>

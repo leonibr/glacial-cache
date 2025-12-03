@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageId>GlacialCache.PostgreSQL</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Ashley Marques</Authors>
+    <Description>A high-performance, pluggable distributed cache provider for .NET using PostgreSQL as the backend. See docs/getting-started.md for a quick start and the docs/ folder for full configuration, architecture, and troubleshooting guides.</Description>
+    <PackageTags>cache;distributed;postgresql;dotnet</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+    <RepositoryUrl>https://github.com/leonibr/frost-cache</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/leonibr/frost-cache</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql" Version="10.0.0" />
+    <PackageReference Include="Polly" Version="8.6.2" />
+    <PackageReference Include="MemoryPack" Version="1.21.4" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />
+    <PackageReference Include="Microsoft.Extensions.ObjectPool" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net9.0'">
+    <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="9.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.7" />
+    <PackageReference Include="Microsoft.Extensions.ObjectPool" Version="9.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.7" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.ObjectPool" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

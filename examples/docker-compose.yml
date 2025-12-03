@@ -1,0 +1,106 @@
+services:
+  # PostgreSQL database for all examples
+  postgres:
+    image: postgres:17-alpine
+    container_name: glacialcache-postgres
+    environment:
+      POSTGRES_DB: glacialcache
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -h 127.0.0.1 -p ${POSTGRES_PORT:-5432} -U $$POSTGRES_USER -t 5 || exit 1",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+    networks:
+      - glacialcache-network
+
+  # Basic Example (Standard PostgreSQL)
+  glacialcache-basic:
+    build:
+      context: ..
+      dockerfile: examples/GlacialCache.Example.Basic/Dockerfile
+    container_name: glacialcache-basic
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=glacialcache
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    networks:
+      - glacialcache-network
+    profiles:
+      - basic
+
+  # CacheEntry Example (Advanced CacheEntry Features)
+  glacialcache-cacheentry:
+    build:
+      context: ..
+      dockerfile: examples/GlacialCache.Example.CacheEntry/Dockerfile
+    container_name: glacialcache-cacheentry
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=glacialcache
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    networks:
+      - glacialcache-network
+    profiles:
+      - cacheentry
+
+  # MemoryPack Example (High-Performance Serialization)
+  glacialcache-memorypack:
+    build:
+      context: ..
+      dockerfile: examples/GlacialCache.Example.MemoryPack/Dockerfile
+    container_name: glacialcache-memorypack
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=glacialcache
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    networks:
+      - glacialcache-network
+    profiles:
+      - memorypack
+
+  # Web API Example (RESTful API)
+  glacialcache-webapi:
+    build:
+      context: ..
+      dockerfile: examples/GlacialCache.Example.WebApi/Dockerfile
+    container_name: glacialcache-webapi
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=glacialcache;Username=postgres;Password=password
+    networks:
+      - glacialcache-network
+    profiles:
+      - webapi
+
+networks:
+  glacialcache-network:
+    driver: bridge

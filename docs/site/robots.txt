@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://leonibr.github.io/frost-cache/sitemap.xml
+

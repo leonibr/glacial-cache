@@ -1,0 +1,69 @@
+name: Build and Deploy Landing Page
+
+on:
+    push:
+        branches:
+            - main
+            - change-to-glacial-cache
+        paths:
+            - "docs/site/**"
+            - ".github/workflows/deploy-site.yml"
+    workflow_dispatch:
+
+jobs:
+    build-and-deploy:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+
+            - name: Install build tools
+              run: |
+                  npm install -g html-minifier clean-css-cli terser
+
+            - name: Build site
+              run: |
+                  cd docs/site
+                  # Minify CSS
+                  cleancss -o styles.min.css styles.css
+
+                  # Minify JavaScript
+                  terser main.js -o main.min.js --compress --mangle
+
+                  # Minify HTML
+                  html-minifier --collapse-whitespace --remove-comments --minify-css true --minify-js true -o index.min.html index.html
+                  html-minifier --collapse-whitespace --remove-comments --minify-css true --minify-js true -o 404.min.html 404.html
+
+                  # Create dist folder
+                  mkdir -p dist
+
+                  # Copy minified files
+                  cp index.min.html dist/index.html
+                  cp 404.min.html dist/404.html
+                  cp styles.min.css dist/styles.css
+                  cp main.min.js dist/main.js
+
+                  # Copy static assets
+                  cp favicon.svg dist/
+                  cp favicon-96x96.png dist/
+                  cp favicon.ico dist/
+                  cp apple-touch-icon.png dist/
+                  cp web-app-manifest-192x192.png dist/
+                  cp web-app-manifest-512x512.png dist/
+                  cp site.webmanifest dist/
+                  cp robots.txt dist/
+                  cp sitemap.xml dist/
+                  cp _headers dist/
+
+            - name: Deploy to GitHub Pages
+              uses: peaceiris/actions-gh-pages@v3
+              with:
+                  github_token: ${{ secrets.GITHUB_TOKEN }}
+                  publish_dir: ./docs/site/dist
+                  publish_branch: gh-pages

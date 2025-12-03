@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <OutputType>Exe</OutputType>
+    <DebugType>pdbonly</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" Version="0.15.2" />
+    <PackageReference Include="BenchmarkDotNet.Diagnostics.Windows" Version="0.15.2" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="9.0.7" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.7" />
+    <PackageReference Include="Testcontainers.PostgreSql" Version="4.6.0" />
+    <PackageReference Include="Sloop" Version="2.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GlacialCache.PostgreSQL\GlacialCache.PostgreSQL.csproj" />
+  </ItemGroup>
+
+</Project>

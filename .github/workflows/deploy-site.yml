@@ -7,10 +7,13 @@ on:
         paths:
             - "docs/site/**"
             - ".github/workflows/deploy-site.yml"
+    workflow_dispatch:
 
 jobs:
     build-and-deploy:
         runs-on: ubuntu-latest
+        permissions:
+            contents: write
 
         steps:
             - name: Checkout repository
@@ -60,14 +63,12 @@ jobs:
                   cp _headers dist/
 
             - name: Add CNAME file for custom domain (if configured)
-              if: env.CUSTOM_DOMAIN != ''
+              if: secrets.CUSTOM_DOMAIN != ''
               run: |
-                  echo "${{ env.CUSTOM_DOMAIN }}" > docs/site/dist/CNAME
-              env:
-                  CUSTOM_DOMAIN: ${{ secrets.CUSTOM_DOMAIN }}
+                  echo "${{ secrets.CUSTOM_DOMAIN }}" > docs/site/dist/CNAME
 
             - name: Deploy to GitHub Pages
-              uses: peaceiris/actions-gh-pages@v3
+              uses: peaceiris/actions-gh-pages@v4
               with:
                   github_token: ${{ secrets.GITHUB_TOKEN }}
                   publish_dir: ./docs/site/dist

@@ -1,6 +1,4 @@
-## GlacialCache.PostgreSQL
-
-![GlacialCache hero banner (placeholder)](docs/assets/glacialcache-hero.png)
+## ❄️ GlacialCache
 
 **PostgreSQL-backed distributed caching for .NET** — reuse the database you already trust to get durable, cross-instance caching without adding new infrastructure.
 
@@ -215,5 +213,5 @@ Issues and pull requests are welcome.
 
 ### License
 
-GlacialCache.PostgreSQL is open source software licensed under the **MIT License**.  
+GlacialCache is open source software licensed under the **MIT License**.  
 See the `LICENSE` file for details.

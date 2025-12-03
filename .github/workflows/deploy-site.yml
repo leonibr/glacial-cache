@@ -3,12 +3,10 @@ name: Build and Deploy Landing Page
 on:
     push:
         branches:
-            - main
-            - change-to-glacial-cache
+            - master
         paths:
             - "docs/site/**"
             - ".github/workflows/deploy-site.yml"
-    workflow_dispatch:
 
 jobs:
     build-and-deploy:
@@ -60,6 +58,13 @@ jobs:
                   cp robots.txt dist/
                   cp sitemap.xml dist/
                   cp _headers dist/
+
+            - name: Add CNAME file for custom domain (if configured)
+              if: env.CUSTOM_DOMAIN != ''
+              run: |
+                  echo "${{ env.CUSTOM_DOMAIN }}" > docs/site/dist/CNAME
+              env:
+                  CUSTOM_DOMAIN: ${{ secrets.CUSTOM_DOMAIN }}
 
             - name: Deploy to GitHub Pages
               uses: peaceiris/actions-gh-pages@v3

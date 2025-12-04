@@ -9,7 +9,9 @@ using GlacialCache.PostgreSQL.Abstractions;
 namespace GlacialCache.Benchmarks;
 
 /// <summary>
-/// Quick verification test for batch operations functionality.
+/// Verification test for batch operations functionality (NOT a benchmark).
+/// This is a pre-benchmark verification tool to ensure batch operations work correctly
+/// before running performance benchmarks. Useful for CI/CD validation.
 /// Run this before benchmarks to ensure everything works correctly.
 /// </summary>
 public class BatchOperationsTest
@@ -27,7 +29,6 @@ public class BatchOperationsTest
             .Build();
 
         await postgres.StartAsync();
-        Console.WriteLine("✅ PostgreSQL container started");
 
         // Setup GlacialCache
         var services = new ServiceCollection();

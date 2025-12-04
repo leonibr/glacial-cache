@@ -12,82 +12,133 @@ Performance benchmarks for GlacialCache.PostgreSQL using BenchmarkDotNet, includ
 
 ### Execute Benchmarks
 
-**GlacialCache-only benchmarks:**
+**Run all benchmarks:**
 
 ```bash
 cd src/GlacialCache.Benchmarks
 dotnet run -c Release
 ```
 
-**Direct GlacialCache vs Sloop comparison:**
+**Run verification test before benchmarks:**
 
 ```bash
-# First, add Sloop package reference (check latest version)
-# dotnet add package Sloop
-
-# Then uncomment Sloop code in GlacialCacheVsSloopBenchmarks.cs and run:
 cd src/GlacialCache.Benchmarks
-dotnet run -c Release --project . GlacialCacheVsSloopBenchmarks
+dotnet run -c Release -- --test
 ```
 
-## 📊 Benchmark Tests
+**Run specific benchmark class:**
 
-The benchmarks test the following operations at different parallelism levels (1, 10, 50):
+```bash
+cd src/GlacialCache.Benchmarks
+dotnet run -c Release -- --filter *GlacialCacheVsSloopBenchmarks*
+```
 
-### Core Operations
+**Alternative ways to run specific benchmarks:**
 
-- **SetAsync**: Sequential cache write operations
-- **GetAsync**: Sequential cache read operations
-- **SetAsync_Parallel**: Parallel cache write operations
-- **GetAsync_Parallel**: Parallel cache read operations
+```bash
+# Using filter with wildcard pattern
+dotnet run -c Release -- --filter *GlacialCacheVsSloopBenchmarks*
 
-### Direct Comparison Tests (GlacialCache vs Sloop)
+# Using filter without wildcard (exact match)
+dotnet run -c Release -- --filter GlacialCacheVsSloopBenchmarks
 
-The comparative benchmark (`GlacialCacheVsSloopBenchmarks`) is **ready to run** with identical test conditions for both implementations:
+# Using benchmark number (shown in interactive menu)
+dotnet run -c Release -- 1
+```
 
-**Current Status:**
+## 📊 Benchmark Suite
 
-- ✅ **GlacialCache benchmarks**: Ready to run
-- ⚠️ **Sloop benchmarks**: Commented out (requires manual setup)
+The benchmark suite has been consolidated and optimized to focus on meaningful, high-impact benchmarks:
 
-**Setup for Sloop Comparison:**
+### 1. GlacialCacheVsSloopBenchmarks
 
-1. Add Sloop package: `dotnet add package Sloop --version x.x.x`
-2. Uncomment Sloop service configuration in `Setup()` method
-3. Uncomment Sloop benchmark methods
-4. Update the Sloop API calls to match their current version
+**Purpose**: Head-to-head comparison between GlacialCache and Sloop using identical test conditions.
 
-**When enabled, both implementations will use:**
+**Tests**:
 
-- **Shared PostgreSQL Container**: Same database instance for fair comparison
-- **Identical Test Data**: Same keys, values, and expiration settings
-- **Same Connection Pool**: Both libraries use optimized PostgreSQL connection settings
-- **Separate Schemas**: `glacial.cache_entries` vs `sloop.cache_entries` to avoid conflicts
+- Single operations: `SetAsync`, `GetAsync`
+- Parallel operations: `SetAsync_Parallel`, `GetAsync_Parallel` (using Task.WhenAll)
+- Batch operations: `SetMultipleAsync` (GlacialCache only - uses NpgsqlBatch)
 
-### Test Configuration
+**Parameters**:
 
-- **Database**: PostgreSQL 16 Alpine (via Testcontainers)
-- **Data Size**: Random values between 100B and 1KB
-- **Pre-population**: 1,000 cache entries for read benchmarks
-- **Expiration**: 30-minute sliding + 1-hour absolute expiration
-- **Connection Pooling**: Enabled with optimized settings
+- Parallelism: 1, 10, 50 (sequential, medium, high concurrency)
 
-## 🔍 Direct Comparison with Sloop
+**Key Features**:
 
-These benchmarks provide **head-to-head comparison** with [Sloop](https://github.com/dev-hancock/Sloop) using identical test conditions. The comparative benchmark tests both libraries side-by-side for accurate performance analysis.
+- Shared PostgreSQL container for fair comparison
+- Identical test data and expiration settings
+- Separate schemas to avoid conflicts
+- Proper result consumption to prevent JIT optimization
 
-### Expected Sloop Baseline Results
+### 2. GlacialCacheBatchBenchmarks
 
-Based on [Sloop's published benchmark results](https://github.com/dev-hancock/Sloop#-benchmark-results):
+**Purpose**: Compare batch operations (SetMultipleAsync/GetMultipleAsync) vs parallel individual operations.
 
-| Framework | Method            | Parallelism | Expected Range |
-| --------- | ----------------- | ----------- | -------------- |
-| Sloop     | SetAsync          | 1           | ~60 µs         |
-| Sloop     | GetAsync          | 1           | ~73 µs         |
-| Sloop     | SetAsync_Parallel | 10          | ~580 µs        |
-| Sloop     | GetAsync_Parallel | 10          | ~840 µs        |
-| Sloop     | SetAsync_Parallel | 50          | ~870 µs        |
-| Sloop     | GetAsync_Parallel | 50          | ~2,030 µs      |
+**Tests**:
+
+- **Individual Operations** (Baseline): Parallel SetAsync/GetAsync/RemoveAsync using Task.WhenAll
+- **Batch Operations**: SetMultipleAsync/GetMultipleAsync/RemoveMultipleAsync/RefreshMultipleAsync using single connection with NpgsqlBatch
+
+**Parameters**:
+
+- Batch Size: 10, 50, 100, 500 (small, medium, large, very large)
+
+**Key Insights**:
+
+- Batch operations use a single connection from the pool with NpgsqlBatch
+- Should show significant performance improvement over parallel individual operations for larger batch sizes
+- Demonstrates the efficiency of batch operations for bulk cache updates
+
+### 3. MemoryPackPerformanceBenchmarks
+
+**Purpose**: Compare MemoryPack vs System.Text.Json serialization performance.
+
+**Tests**:
+
+- **Serialize**: String and ComplexObject serialization
+- **Deserialize**: String and ComplexObject deserialization (pre-serialized in setup)
+
+**Key Features**:
+
+- Only tests representative types (String for simple, ComplexObject for complex scenarios)
+- Properly separates serialize/deserialize operations (no serialization in deserialize hot path)
+- System.Text.Json marked as baseline for comparison
+- Pre-serialized data in GlobalSetup to avoid overhead
+
+### 4. ObservablePropertyBenchmarks
+
+**Purpose**: Measure ObservableProperty performance for configuration management.
+
+**Tests**:
+
+- Property get/set operations
+- Implicit conversions
+- Multiple property changes
+- Event handler overhead
+
+**Key Features**:
+
+- Essential property change operations only
+- Tests event handling overhead
+- Useful for understanding configuration change performance
+
+### 5. BatchOperationsTest (Verification Tool)
+
+**Purpose**: Pre-benchmark verification test to ensure batch operations work correctly.
+
+**Note**: This is a verification test, not a benchmark. Useful for CI/CD validation before running performance benchmarks.
+
+## 🔍 Benchmark Design Principles
+
+The benchmarks follow BenchmarkDotNet best practices:
+
+1. **Proper Isolation**: Each benchmark tests one specific operation
+2. **Pre-generated Data**: All test data generated in `[GlobalSetup]`, no random generation in hot path
+3. **Result Consumption**: All results are consumed/validated to prevent JIT optimization
+4. **Baseline Marking**: Appropriate benchmarks marked as baseline for comparison
+5. **Parameterization**: Consistent use of `[Params]` for scalability testing
+6. **Memory Diagnostics**: `[MemoryDiagnoser]` used where memory matters
 
 ## 🛠️ Technical Details
 
@@ -95,63 +146,75 @@ Based on [Sloop's published benchmark results](https://github.com/dev-hancock/Sl
 
 - Uses **Testcontainers** for isolated PostgreSQL instances
 - Implements **connection pooling** with optimized settings
+- Batch operations use **NpgsqlBatch** for efficient multi-operation execution
 - Includes **clock synchronization** for multi-instance safety
 - Features **background cleanup** of expired entries
 
-### Key Differences from Sloop
+### Terminology
 
-- **Clock Synchronization Service**: Prevents drift in distributed scenarios
-- **Advanced Expiration Handling**: Combined sliding + absolute expiration
-- **Optimized Connection Management**: Custom data source with tuned pool settings
-- **Enhanced Error Handling**: Comprehensive logging and resilience patterns
+- **Batch Operations**: SetMultipleAsync/GetMultipleAsync - uses single connection with NpgsqlBatch
+- **Individual Operations**: SetAsync/GetAsync - one operation per call
+- **Parallel Operations**: Multiple individual operations with Task.WhenAll
 
-### Hardware Considerations
+### Test Configuration
 
-Benchmark results will vary based on:
-
-- CPU performance (PostgreSQL processing)
-- Memory availability (connection pooling)
-- Storage I/O (database operations)
-- Network latency (container communication)
+- **Database**: PostgreSQL 17 Alpine (via Testcontainers)
+- **Data Size**: Random values between 100B and 1KB
+- **Pre-population**: 1,000 cache entries for read benchmarks
+- **Expiration**: 30-minute sliding + 1-hour absolute expiration
+- **Connection Pooling**: Enabled with optimized settings
 
 ## 📈 Interpreting Results
 
 - **Lower mean times** = better performance
 - **Lower memory allocation** = better efficiency
+- **Baseline ratio** = relative performance (1.00 = same as baseline, <1.00 = faster, >1.00 = slower)
 - **Parallel scaling** should show reasonable scaling with parallelism
-- **Variance** indicates consistency of performance
+- **Batch vs Individual** should show batch operations are faster for larger batch sizes
 
 ## 🚀 Performance Optimization Tips
 
 Based on benchmark results, consider:
 
-1. **Connection Pool Tuning**: Adjust `MinPoolSize` and `MaxPoolSize`
-2. **Cleanup Frequency**: Increase `ExpiredItemsDeletionInterval` for write-heavy workloads
-3. **Clock Sync**: Disable `EnableClockSynchronization` for single-instance deployments
-4. **Expiration Strategy**: Use appropriate sliding vs absolute expiration policies
+1. **Use Batch Operations**: For multiple items, use SetMultipleAsync/GetMultipleAsync instead of parallel individual calls
+2. **Connection Pool Tuning**: Adjust `MinPoolSize` and `MaxPoolSize` based on workload
+3. **Cleanup Frequency**: Increase `ExpiredItemsDeletionInterval` for write-heavy workloads
+4. **Clock Sync**: Disable `EnableClockSynchronization` for single-instance deployments
+5. **Expiration Strategy**: Use appropriate sliding vs absolute expiration policies
 
 ## 🔧 Customizing Benchmarks
 
 To modify the benchmarks:
 
-1. **Change parallelism levels**: Update `[Params(1, 10, 50)]`
-2. **Adjust data sizes**: Modify `GenerateRandomValue()` method
-3. **Add custom scenarios**: Create new `[Benchmark]` methods
-4. **Configure database**: Update PostgreSQL container settings in `Setup()`
+1. **Change parallelism levels**: Update `[Params(1, 10, 50)]` in GlacialCacheVsSloopBenchmarks
+2. **Change batch sizes**: Update `[Params(10, 50, 100, 500)]` in GlacialCacheBatchBenchmarks
+3. **Adjust data sizes**: Modify `GenerateRandomValue()` method
+4. **Add custom scenarios**: Create new `[Benchmark]` methods
+5. **Configure database**: Update PostgreSQL container settings in `Setup()` methods
 
 ## 📝 Example Output
 
 ```
-BenchmarkDotNet=v0.14.0, OS=Windows 11
+BenchmarkDotNet=v0.15.2, OS=Windows 11
 Intel Core i7-12700K, 1 CPU, 20 logical and 12 physical cores
-.NET 9.0.0 (9.0.24.52809), X64 RyuJIT
+.NET 9.0.0, X64 RyuJIT
 
-| Method            | Parallelism | Mean       | Error     | StdDev    | Allocated |
-|------------------ |------------ |-----------:|----------:|----------:|----------:|
-| SetAsync          | 1           | 65.2 µs    | 1.2 µs    | 1.1 µs    | 6.1 KB    |
-| GetAsync          | 1           | 78.5 µs    | 1.5 µs    | 1.4 µs    | 4.2 KB    |
-| SetAsync_Parallel | 10          | 620.3 µs   | 12.1 µs   | 11.3 µs   | 61.5 KB   |
-| GetAsync_Parallel | 10          | 890.7 µs   | 17.8 µs   | 16.6 µs   | 42.1 KB   |
+| Method                      | BatchSize | Mean      | Error    | StdDev   | Ratio | Allocated |
+|---------------------------- |---------- |----------:|---------:|---------:|------:|----------:|
+| Individual_SetAsync         | 10        | 1,234 µs  | 12.3 µs  | 11.5 µs  | 1.00  | 61.5 KB   |
+| Batch_SetMultipleAsync      | 10        | 456 µs    | 4.5 µs   | 4.2 µs   | 0.37  | 12.3 KB   |
+| Individual_SetAsync         | 100       | 12,345 µs | 123 µs   | 115 µs   | 1.00  | 615 KB    |
+| Batch_SetMultipleAsync      | 100       | 1,234 µs  | 12.3 µs  | 11.5 µs  | 0.10  | 45.6 KB   |
 ```
 
 _Note: Results shown are illustrative. Actual performance will vary based on hardware and system configuration._
+
+## 🎯 Key Metrics to Track
+
+After running benchmarks, look for:
+
+1. **Batch vs Individual**: How much faster SetMultipleAsync is vs parallel SetAsync calls
+2. **MemoryPack vs System.Text.Json**: Serialization performance comparison
+3. **GlacialCache vs Sloop**: Head-to-head comparison with identical test conditions
+4. **Scalability**: How performance scales with batch size and parallelism
+5. **Memory efficiency**: Allocation patterns for different operation types

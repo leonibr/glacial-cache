@@ -1,23 +1,28 @@
 using BenchmarkDotNet.Attributes;
-using BenchmarkDotNet.Running;
 using MemoryPack;
 using System.Text.Json;
-using GlacialCache.PostgreSQL.Models;
 
 namespace GlacialCache.Benchmarks;
 
+/// <summary>
+/// Benchmarks comparing MemoryPack vs System.Text.Json serialization performance.
+/// Tests representative types: String (simple) and ComplexObject (complex with nested structures).
+/// Serialize and deserialize operations are properly separated with pre-serialized data in setup.
+/// </summary>
 [MemoryDiagnoser]
 [SimpleJob]
+[GroupBenchmarksBy(BenchmarkDotNet.Configs.BenchmarkLogicalGroupRule.ByCategory)]
+[CategoriesColumn]
 public class MemoryPackPerformanceBenchmarks
 {
     private readonly string _testString = "Hello, World! This is a test string for benchmarking serialization performance.";
-    private readonly int _testInt = 42;
-    private readonly double _testDouble = 3.14159;
-    private readonly DateTime _testDateTime = DateTime.UtcNow;
-    private readonly int[] _testArray = Enumerable.Range(1, 100).ToArray();
-    private readonly List<string> _testList = Enumerable.Range(1, 50).Select(i => $"Item {i}").ToList();
-    private readonly Dictionary<string, int> _testDictionary = Enumerable.Range(1, 25).ToDictionary(i => $"Key{i}", i => i);
     private readonly ComplexTestObject _testComplexObject;
+
+    // Pre-serialized data for deserialize benchmarks (no serialization in hot path)
+    private byte[] _memoryPackStringBytes = null!;
+    private byte[] _systemTextJsonStringBytes = null!;
+    private byte[] _memoryPackComplexObjectBytes = null!;
+    private byte[] _systemTextJsonComplexObjectBytes = null!;
 
     public MemoryPackPerformanceBenchmarks()
     {
@@ -37,258 +42,108 @@ public class MemoryPackPerformanceBenchmarks
         };
     }
 
-    [Benchmark]
-    public byte[] MemoryPack_Serialize_String()
+    [GlobalSetup]
+    public void Setup()
     {
-        return MemoryPackSerializer.Serialize(_testString);
+        // Pre-serialize data for deserialize benchmarks to avoid serialization overhead in hot path
+        _memoryPackStringBytes = MemoryPackSerializer.Serialize(_testString);
+        _systemTextJsonStringBytes = JsonSerializer.SerializeToUtf8Bytes(_testString);
+        _memoryPackComplexObjectBytes = MemoryPackSerializer.Serialize(_testComplexObject);
+        _systemTextJsonComplexObjectBytes = JsonSerializer.SerializeToUtf8Bytes(_testComplexObject);
     }
 
-    [Benchmark]
+    #region Serialize Benchmarks
+
+    /// <summary>
+    /// Baseline: System.Text.Json serialization of string
+    /// </summary>
+    [Benchmark(Baseline = true)]
+    [BenchmarkCategory("Serialize")]
     public byte[] SystemTextJson_Serialize_String()
     {
         return JsonSerializer.SerializeToUtf8Bytes(_testString);
     }
 
+    /// <summary>
+    /// MemoryPack serialization of string
+    /// </summary>
     [Benchmark]
-    public byte[] MemoryPack_Serialize_Int()
+    [BenchmarkCategory("Serialize")]
+    public byte[] MemoryPack_Serialize_String()
     {
-        return MemoryPackSerializer.Serialize(_testInt);
+        return MemoryPackSerializer.Serialize(_testString);
     }
 
-    [Benchmark]
-    public byte[] SystemTextJson_Serialize_Int()
-    {
-        return JsonSerializer.SerializeToUtf8Bytes(_testInt);
-    }
-
-    [Benchmark]
-    public byte[] MemoryPack_Serialize_Double()
-    {
-        return MemoryPackSerializer.Serialize(_testDouble);
-    }
-
-    [Benchmark]
-    public byte[] SystemTextJson_Serialize_Double()
-    {
-        return JsonSerializer.SerializeToUtf8Bytes(_testDouble);
-    }
-
-    [Benchmark]
-    public byte[] MemoryPack_Serialize_DateTime()
-    {
-        return MemoryPackSerializer.Serialize(_testDateTime);
-    }
-
-    [Benchmark]
-    public byte[] SystemTextJson_Serialize_DateTime()
-    {
-        return JsonSerializer.SerializeToUtf8Bytes(_testDateTime);
-    }
-
-    [Benchmark]
-    public byte[] MemoryPack_Serialize_Array()
-    {
-        return MemoryPackSerializer.Serialize(_testArray);
-    }
-
-    [Benchmark]
-    public byte[] SystemTextJson_Serialize_Array()
-    {
-        return JsonSerializer.SerializeToUtf8Bytes(_testArray);
-    }
-
-    [Benchmark]
-    public byte[] MemoryPack_Serialize_List()
-    {
-        return MemoryPackSerializer.Serialize(_testList);
-    }
-
-    [Benchmark]
-    public byte[] SystemTextJson_Serialize_List()
-    {
-        return JsonSerializer.SerializeToUtf8Bytes(_testList);
-    }
-
-    [Benchmark]
-    public byte[] MemoryPack_Serialize_Dictionary()
-    {
-        return MemoryPackSerializer.Serialize(_testDictionary);
-    }
-
-    [Benchmark]
-    public byte[] SystemTextJson_Serialize_Dictionary()
-    {
-        return JsonSerializer.SerializeToUtf8Bytes(_testDictionary);
-    }
-
-    [Benchmark]
-    public byte[] MemoryPack_Serialize_ComplexObject()
-    {
-        return MemoryPackSerializer.Serialize(_testComplexObject);
-    }
-
-    [Benchmark]
+    /// <summary>
+    /// Baseline: System.Text.Json serialization of complex object
+    /// </summary>
+    [Benchmark(Baseline = true)]
+    [BenchmarkCategory("Serialize")]
     public byte[] SystemTextJson_Serialize_ComplexObject()
     {
         return JsonSerializer.SerializeToUtf8Bytes(_testComplexObject);
     }
 
+    /// <summary>
+    /// MemoryPack serialization of complex object
+    /// </summary>
     [Benchmark]
-    public string MemoryPack_Deserialize_String()
+    [BenchmarkCategory("Serialize")]
+    public byte[] MemoryPack_Serialize_ComplexObject()
     {
-        var bytes = MemoryPackSerializer.Serialize(_testString);
-        return MemoryPackSerializer.Deserialize<string>(bytes)!;
+        return MemoryPackSerializer.Serialize(_testComplexObject);
     }
 
-    [Benchmark]
+    #endregion
+
+    #region Deserialize Benchmarks
+
+    /// <summary>
+    /// Baseline: System.Text.Json deserialization of string (pre-serialized in setup)
+    /// </summary>
+    [Benchmark(Baseline = true)]
+    [BenchmarkCategory("Deserialize")]
     public string SystemTextJson_Deserialize_String()
     {
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(_testString);
-        return JsonSerializer.Deserialize<string>(bytes)!;
+        return JsonSerializer.Deserialize<string>(_systemTextJsonStringBytes)!;
     }
 
+    /// <summary>
+    /// MemoryPack deserialization of string (pre-serialized in setup)
+    /// </summary>
     [Benchmark]
-    public int MemoryPack_Deserialize_Int()
+    [BenchmarkCategory("Deserialize")]
+    public string MemoryPack_Deserialize_String()
     {
-        var bytes = MemoryPackSerializer.Serialize(_testInt);
-        return MemoryPackSerializer.Deserialize<int>(bytes);
+        return MemoryPackSerializer.Deserialize<string>(_memoryPackStringBytes)!;
     }
 
-    [Benchmark]
-    public int SystemTextJson_Deserialize_Int()
-    {
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(_testInt);
-        return JsonSerializer.Deserialize<int>(bytes);
-    }
-
-    [Benchmark]
-    public double MemoryPack_Deserialize_Double()
-    {
-        var bytes = MemoryPackSerializer.Serialize(_testDouble);
-        return MemoryPackSerializer.Deserialize<double>(bytes);
-    }
-
-    [Benchmark]
-    public double SystemTextJson_Deserialize_Double()
-    {
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(_testDouble);
-        return JsonSerializer.Deserialize<double>(bytes);
-    }
-
-    [Benchmark]
-    public DateTime MemoryPack_Deserialize_DateTime()
-    {
-        var bytes = MemoryPackSerializer.Serialize(_testDateTime);
-        return MemoryPackSerializer.Deserialize<DateTime>(bytes);
-    }
-
-    [Benchmark]
-    public DateTime SystemTextJson_Deserialize_DateTime()
-    {
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(_testDateTime);
-        return JsonSerializer.Deserialize<DateTime>(bytes);
-    }
-
-    [Benchmark]
-    public int[] MemoryPack_Deserialize_Array()
-    {
-        var bytes = MemoryPackSerializer.Serialize(_testArray);
-        return MemoryPackSerializer.Deserialize<int[]>(bytes)!;
-    }
-
-    [Benchmark]
-    public int[] SystemTextJson_Deserialize_Array()
-    {
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(_testArray);
-        return JsonSerializer.Deserialize<int[]>(bytes)!;
-    }
-
-    [Benchmark]
-    public List<string> MemoryPack_Deserialize_List()
-    {
-        var bytes = MemoryPackSerializer.Serialize(_testList);
-        return MemoryPackSerializer.Deserialize<List<string>>(bytes)!;
-    }
-
-    [Benchmark]
-    public List<string> SystemTextJson_Deserialize_List()
-    {
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(_testList);
-        return JsonSerializer.Deserialize<List<string>>(bytes)!;
-    }
-
-    [Benchmark]
-    public Dictionary<string, int> MemoryPack_Deserialize_Dictionary()
-    {
-        var bytes = MemoryPackSerializer.Serialize(_testDictionary);
-        return MemoryPackSerializer.Deserialize<Dictionary<string, int>>(bytes)!;
-    }
-
-    [Benchmark]
-    public Dictionary<string, int> SystemTextJson_Deserialize_Dictionary()
-    {
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(_testDictionary);
-        return JsonSerializer.Deserialize<Dictionary<string, int>>(bytes)!;
-    }
-
-    [Benchmark]
-    public ComplexTestObject MemoryPack_Deserialize_ComplexObject()
-    {
-        var bytes = MemoryPackSerializer.Serialize(_testComplexObject);
-        return MemoryPackSerializer.Deserialize<ComplexTestObject>(bytes)!;
-    }
-
-    [Benchmark]
+    /// <summary>
+    /// Baseline: System.Text.Json deserialization of complex object (pre-serialized in setup)
+    /// </summary>
+    [Benchmark(Baseline = true)]
+    [BenchmarkCategory("Deserialize")]
     public ComplexTestObject SystemTextJson_Deserialize_ComplexObject()
     {
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(_testComplexObject);
-        return JsonSerializer.Deserialize<ComplexTestObject>(bytes)!;
+        return JsonSerializer.Deserialize<ComplexTestObject>(_systemTextJsonComplexObjectBytes)!;
     }
 
+    /// <summary>
+    /// MemoryPack deserialization of complex object (pre-serialized in setup)
+    /// </summary>
     [Benchmark]
-    public CacheEntry<string> MemoryPack_CacheEntry_Creation()
+    [BenchmarkCategory("Deserialize")]
+    public ComplexTestObject MemoryPack_Deserialize_ComplexObject()
     {
-        return new CacheEntry<string>()
-        {
-            Key = "test-key",
-            Value = _testString
-        };
+        return MemoryPackSerializer.Deserialize<ComplexTestObject>(_memoryPackComplexObjectBytes)!;
     }
 
-    [Benchmark]
-    public CacheEntry<string> MemoryPack_CacheEntry_Serialization()
-    {
-        var entry = new CacheEntry<string>()
-        {
-            Key = "test-key",
-            Value = _testString
-        };
-        _ = entry.SerializedData; // Force serialization
-        return entry;
-    }
-
-    [Benchmark]
-    public CacheEntry<string> MemoryPack_CacheEntry_FromSerializedData()
-    {
-        var bytes = MemoryPackSerializer.Serialize(_testString);
-        return new CacheEntry<string>()
-        {
-            Key = "test-key",
-            Value = _testString
-        };
-    }
-
-    [Benchmark]
-    public CacheEntry<string> MemoryPack_CacheEntry_CreateUnserialized()
-    {
-        return new CacheEntry<string>()
-        {
-            Key = "test-key",
-            Value = _testString
-        };
-    }
+    #endregion
 }
 
+/// <summary>
+/// Complex test object with nested structures for realistic serialization benchmarks
+/// </summary>
 [MemoryPackable]
 public partial record ComplexTestObject
 {

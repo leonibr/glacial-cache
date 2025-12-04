@@ -1,77 +1,88 @@
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using GlacialCache.PostgreSQL.Configuration;
 
 namespace GlacialCache.Benchmarks;
 
-[MemoryDiagnoser]
+/// <summary>
+/// Benchmarks for ObservableProperty performance - essential property change operations only.
+/// Tests property get/set operations and event handling overhead.
+/// </summary>
 [SimpleJob(RuntimeMoniker.Net90)]
 public class ObservablePropertyBenchmarks
 {
     private ObservableProperty<string> _observableProperty = null!;
-    private ObservableProperty<string> _observablePropertyWithLogger = null!;
-    private ILogger _logger = null!;
 
     [GlobalSetup]
     public void Setup()
     {
-        _logger = NullLogger.Instance;
         _observableProperty = new ObservableProperty<string>("TestProperty");
-        _observablePropertyWithLogger = new ObservableProperty<string>("TestProperty", _logger);
     }
 
+    /// <summary>
+    /// Baseline: Setting a property value
+    /// </summary>
     [Benchmark(Baseline = true)]
-    public void SetValue_WithoutLogger()
+    public void SetValue()
     {
         _observableProperty.Value = "TestValue";
     }
 
+    /// <summary>
+    /// Getting a property value
+    /// </summary>
     [Benchmark]
-    public void SetValue_WithLogger()
-    {
-        _observablePropertyWithLogger.Value = "TestValue";
-    }
-
-    [Benchmark]
-    public void GetValue_WithoutLogger()
+    public void GetValue()
     {
         var value = _observableProperty.Value;
+        // Consume value to prevent optimization
+        if (value == null)
+        {
+            throw new InvalidOperationException("Unexpected null value");
+        }
     }
 
+    /// <summary>
+    /// Setting the same value twice (should not raise event on second set)
+    /// </summary>
     [Benchmark]
-    public void GetValue_WithLogger()
-    {
-        var value = _observablePropertyWithLogger.Value;
-    }
-
-    [Benchmark]
-    public void SetSameValue_WithoutLogger()
+    public void SetSameValue()
     {
         _observableProperty.Value = "SameValue";
         _observableProperty.Value = "SameValue"; // Should not raise event
     }
 
-    [Benchmark]
-    public void SetSameValue_WithLogger()
-    {
-        _observablePropertyWithLogger.Value = "SameValue";
-        _observablePropertyWithLogger.Value = "SameValue"; // Should not raise event
-    }
-
+    /// <summary>
+    /// Implicit conversion to value type
+    /// </summary>
     [Benchmark]
     public void ImplicitConversion_ToValue()
     {
         string value = _observableProperty;
+        // Consume value to prevent optimization
+        if (value == null)
+        {
+            throw new InvalidOperationException("Unexpected null value");
+        }
     }
 
+    /// <summary>
+    /// Implicit conversion from value type
+    /// </summary>
     [Benchmark]
     public void ImplicitConversion_FromValue()
     {
         ObservableProperty<string> property = "TestValue";
+        // Consume property to prevent optimization
+        if (property.Value == null)
+        {
+            throw new InvalidOperationException("Unexpected null value");
+        }
     }
 
+    /// <summary>
+    /// Multiple property changes in a loop
+    /// </summary>
     [Benchmark]
     public void MultiplePropertyChanges()
     {
@@ -81,6 +92,9 @@ public class ObservablePropertyBenchmarks
         }
     }
 
+    /// <summary>
+    /// Property changes with event handler attached (measures event overhead)
+    /// </summary>
     [Benchmark]
     public void PropertyWithEventHandler()
     {
@@ -91,6 +105,12 @@ public class ObservablePropertyBenchmarks
         for (int i = 0; i < 100; i++)
         {
             property.Value = $"Value_{i}";
+        }
+
+        // Consume eventCount to prevent optimization
+        if (eventCount != 100)
+        {
+            throw new InvalidOperationException($"Expected 100 events, got {eventCount}");
         }
     }
 }

@@ -31,13 +31,13 @@ public class MemoryPackPerformanceBenchmarks
             Id = 42,
             Name = "Test Object",
             Tags = new[] { "tag1", "tag2", "tag3", "tag4", "tag5" },
-            Metadata = new Dictionary<string, object>
+            Metadata = new Dictionary<string, MetadataValue>
             {
-                ["key1"] = "value1",
-                ["key2"] = 123,
-                ["key3"] = 3.14,
-                ["key4"] = true,
-                ["key5"] = DateTime.UtcNow
+                ["key1"] = new MetadataValue { StringValue = "value1" },
+                ["key2"] = new MetadataValue { IntValue = 123 },
+                ["key3"] = new MetadataValue { DoubleValue = 3.14 },
+                ["key4"] = new MetadataValue { BoolValue = true },
+                ["key5"] = new MetadataValue { DateTimeValue = DateTime.UtcNow }
             }
         };
     }
@@ -75,9 +75,9 @@ public class MemoryPackPerformanceBenchmarks
     }
 
     /// <summary>
-    /// Baseline: System.Text.Json serialization of complex object
+    /// System.Text.Json serialization of complex object
     /// </summary>
-    [Benchmark(Baseline = true)]
+    [Benchmark]
     [BenchmarkCategory("Serialize")]
     public byte[] SystemTextJson_Serialize_ComplexObject()
     {
@@ -119,9 +119,9 @@ public class MemoryPackPerformanceBenchmarks
     }
 
     /// <summary>
-    /// Baseline: System.Text.Json deserialization of complex object (pre-serialized in setup)
+    /// System.Text.Json deserialization of complex object (pre-serialized in setup)
     /// </summary>
-    [Benchmark(Baseline = true)]
+    [Benchmark]
     [BenchmarkCategory("Deserialize")]
     public ComplexTestObject SystemTextJson_Deserialize_ComplexObject()
     {
@@ -150,5 +150,19 @@ public partial record ComplexTestObject
     public int Id { get; init; }
     public string Name { get; init; } = string.Empty;
     public string[] Tags { get; init; } = Array.Empty<string>();
-    public Dictionary<string, object> Metadata { get; init; } = new();
+    public Dictionary<string, MetadataValue> Metadata { get; init; } = new();
+}
+
+/// <summary>
+/// Metadata value type that can hold different value types for serialization
+/// Uses nullable properties to represent different types (only one should be set)
+/// </summary>
+[MemoryPackable]
+public partial record MetadataValue
+{
+    public string? StringValue { get; init; }
+    public int? IntValue { get; init; }
+    public double? DoubleValue { get; init; }
+    public bool? BoolValue { get; init; }
+    public DateTime? DateTimeValue { get; init; }
 }

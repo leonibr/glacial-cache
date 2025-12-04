@@ -48,7 +48,7 @@ public class AdvancedScenariosTests : IntegrationTestBase
                 .WithCleanUp(true)
                 .Build();
 
-            await _postgres.StartAsync();
+            await _postgres.StartWithRetryAsync(Output);
             Output.WriteLine($"✅ PostgreSQL container started: {_postgres.GetConnectionString()}");
 
             // Initialize TimeTestHelper for time control in tests
@@ -57,7 +57,7 @@ public class AdvancedScenariosTests : IntegrationTestBase
         catch (Exception ex)
         {
             Output.WriteLine($"Failed to initialize PostgreSQL container: {ex.Message}");
-            throw new Exception($"Docker/PostgreSQL not available: {ex.Message}");
+            throw new Exception($"Docker/PostgreSQL not available: {ex.Message}", ex);
         }
     }
 
@@ -65,10 +65,30 @@ public class AdvancedScenariosTests : IntegrationTestBase
     {
         if (_postgres != null)
         {
-            // Clean up shared schema used by manager election tests
-            await CleanupTestSchemaAsync("test_manager_election");
+            try
+            {
+                // Clean up shared schema used by manager election tests
+                await CleanupTestSchemaAsync("test_manager_election");
+            }
+            catch (Exception ex)
+            {
+                Output.WriteLine($"⚠️ Warning: Failed to cleanup schema during container disposal: {ex.Message}");
+            }
 
-            await _postgres.DisposeAsync();
+            try
+            {
+                await _postgres.DisposeAsync();
+                Output.WriteLine("✅ PostgreSQL container disposed");
+            }
+            catch (Exception ex)
+            {
+                Output.WriteLine($"⚠️ Warning: Error disposing container: {ex.Message}");
+                // Don't throw - cleanup failures shouldn't fail tests
+            }
+            finally
+            {
+                _postgres = null;
+            }
         }
     }
 

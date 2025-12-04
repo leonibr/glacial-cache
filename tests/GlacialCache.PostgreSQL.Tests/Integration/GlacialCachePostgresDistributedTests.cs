@@ -39,7 +39,7 @@ public class GlacialCachePostgresDistributedTests : IntegrationTestBase
                 .WithCleanUp(true)
                 .Build();
 
-            await _postgres.StartAsync();
+            await _postgres.StartWithRetryAsync(Output);
 
             var services = new ServiceCollection();
             services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Debug));
@@ -65,7 +65,7 @@ public class GlacialCachePostgresDistributedTests : IntegrationTestBase
         catch (Exception ex)
         {
             Output.WriteLine($"Failed to initialize PostgreSQL container: {ex.Message}");
-            throw new Exception($"Docker/PostgreSQL not available: {ex.Message}");
+            throw new Exception($"Docker/PostgreSQL not available: {ex.Message}", ex);
         }
     }
 
@@ -73,12 +73,32 @@ public class GlacialCachePostgresDistributedTests : IntegrationTestBase
     {
         if (_serviceProvider is IDisposable disposable)
         {
-            disposable.Dispose();
+            try
+            {
+                disposable.Dispose();
+            }
+            catch (Exception ex)
+            {
+                Output.WriteLine($"⚠️ Warning: Error disposing service provider: {ex.Message}");
+            }
         }
 
         if (_postgres != null)
         {
-            await _postgres.DisposeAsync();
+            try
+            {
+                await _postgres.DisposeAsync();
+                Output.WriteLine("✅ PostgreSQL container disposed");
+            }
+            catch (Exception ex)
+            {
+                Output.WriteLine($"⚠️ Warning: Error disposing container: {ex.Message}");
+                // Don't throw - cleanup failures shouldn't fail tests
+            }
+            finally
+            {
+                _postgres = null;
+            }
         }
     }
 

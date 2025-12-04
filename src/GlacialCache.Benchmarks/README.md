@@ -1,12 +1,12 @@
 # GlacialCache Benchmarks
 
-Performance benchmarks for GlacialCache.PostgreSQL using BenchmarkDotNet, including **direct comparisons** with [Sloop](https://github.com/dev-hancock/Sloop) - another PostgreSQL-backed IDistributedCache implementation.
+Performance benchmarks for GlacialCache.PostgreSQL using BenchmarkDotNet.
 
 ## 🏃‍♂️ Running the Benchmarks
 
 ### Prerequisites
 
-- **.NET 9.0 SDK or later**
+- **.NET 10.0 SDK or later**
 - **Docker** (for PostgreSQL Testcontainers)
 - Sufficient system resources for running PostgreSQL containers
 
@@ -30,17 +30,17 @@ dotnet run -c Release -- --test
 
 ```bash
 cd src/GlacialCache.Benchmarks
-dotnet run -c Release -- --filter *GlacialCacheVsSloopBenchmarks*
+dotnet run -c Release -- --filter *GlacialCacheBatchBenchmarks*
 ```
 
 **Alternative ways to run specific benchmarks:**
 
 ```bash
 # Using filter with wildcard pattern
-dotnet run -c Release -- --filter *GlacialCacheVsSloopBenchmarks*
+dotnet run -c Release -- --filter *GlacialCacheBatchBenchmarks*
 
 # Using filter without wildcard (exact match)
-dotnet run -c Release -- --filter GlacialCacheVsSloopBenchmarks
+dotnet run -c Release -- --filter GlacialCacheBatchBenchmarks
 
 # Using benchmark number (shown in interactive menu)
 dotnet run -c Release -- 1
@@ -50,28 +50,7 @@ dotnet run -c Release -- 1
 
 The benchmark suite has been consolidated and optimized to focus on meaningful, high-impact benchmarks:
 
-### 1. GlacialCacheVsSloopBenchmarks
-
-**Purpose**: Head-to-head comparison between GlacialCache and Sloop using identical test conditions.
-
-**Tests**:
-
-- Single operations: `SetAsync`, `GetAsync`
-- Parallel operations: `SetAsync_Parallel`, `GetAsync_Parallel` (using Task.WhenAll)
-- Batch operations: `SetMultipleAsync` (GlacialCache only - uses NpgsqlBatch)
-
-**Parameters**:
-
-- Parallelism: 1, 10, 50 (sequential, medium, high concurrency)
-
-**Key Features**:
-
-- Shared PostgreSQL container for fair comparison
-- Identical test data and expiration settings
-- Separate schemas to avoid conflicts
-- Proper result consumption to prevent JIT optimization
-
-### 2. GlacialCacheBatchBenchmarks
+### 1. GlacialCacheBatchBenchmarks
 
 **Purpose**: Compare batch operations (SetMultipleAsync/GetMultipleAsync) vs parallel individual operations.
 
@@ -90,7 +69,7 @@ The benchmark suite has been consolidated and optimized to focus on meaningful, 
 - Should show significant performance improvement over parallel individual operations for larger batch sizes
 - Demonstrates the efficiency of batch operations for bulk cache updates
 
-### 3. MemoryPackPerformanceBenchmarks
+### 2. MemoryPackPerformanceBenchmarks
 
 **Purpose**: Compare MemoryPack vs System.Text.Json serialization performance.
 
@@ -106,7 +85,7 @@ The benchmark suite has been consolidated and optimized to focus on meaningful, 
 - System.Text.Json marked as baseline for comparison
 - Pre-serialized data in GlobalSetup to avoid overhead
 
-### 4. ObservablePropertyBenchmarks
+### 3. ObservablePropertyBenchmarks
 
 **Purpose**: Measure ObservableProperty performance for configuration management.
 
@@ -123,7 +102,7 @@ The benchmark suite has been consolidated and optimized to focus on meaningful, 
 - Tests event handling overhead
 - Useful for understanding configuration change performance
 
-### 5. BatchOperationsTest (Verification Tool)
+### 4. BatchOperationsTest (Verification Tool)
 
 **Purpose**: Pre-benchmark verification test to ensure batch operations work correctly.
 
@@ -186,11 +165,10 @@ Based on benchmark results, consider:
 
 To modify the benchmarks:
 
-1. **Change parallelism levels**: Update `[Params(1, 10, 50)]` in GlacialCacheVsSloopBenchmarks
-2. **Change batch sizes**: Update `[Params(10, 50, 100, 500)]` in GlacialCacheBatchBenchmarks
-3. **Adjust data sizes**: Modify `GenerateRandomValue()` method
-4. **Add custom scenarios**: Create new `[Benchmark]` methods
-5. **Configure database**: Update PostgreSQL container settings in `Setup()` methods
+1. **Change batch sizes**: Update `[Params(10, 50, 100, 500)]` in GlacialCacheBatchBenchmarks
+2. **Adjust data sizes**: Modify `GenerateRandomValue()` method
+3. **Add custom scenarios**: Create new `[Benchmark]` methods
+4. **Configure database**: Update PostgreSQL container settings in `Setup()` methods
 
 ## 📝 Example Output
 
@@ -215,6 +193,5 @@ After running benchmarks, look for:
 
 1. **Batch vs Individual**: How much faster SetMultipleAsync is vs parallel SetAsync calls
 2. **MemoryPack vs System.Text.Json**: Serialization performance comparison
-3. **GlacialCache vs Sloop**: Head-to-head comparison with identical test conditions
-4. **Scalability**: How performance scales with batch size and parallelism
-5. **Memory efficiency**: Allocation patterns for different operation types
+3. **Scalability**: How performance scales with batch size and parallelism
+4. **Memory efficiency**: Allocation patterns for different operation types

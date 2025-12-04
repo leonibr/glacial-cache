@@ -57,32 +57,21 @@ jobs:
     test:
         runs-on: ubuntu-latest
         needs: build
-        services:
-            postgres:
-                image: postgres:17
-                env:
-                    POSTGRES_USER: postgres
-                    POSTGRES_PASSWORD: postgres
-                    POSTGRES_DB: glacialcache_test
-                options: >-
-                    --health-cmd pg_isready
-                    --health-interval 10s
-                    --health-timeout 5s
-                    --health-retries 5
-                ports:
-                    - 5432:5432
+        strategy:
+            matrix:
+                dotnet-version: ["8.0.x", "9.0.x", "10.0.x"]
 
         steps:
             - name: Checkout code
               uses: actions/checkout@v4
 
-            - name: Setup .NET
+            - name: Setup .NET ${{ matrix.dotnet-version }}
               uses: actions/setup-dotnet@v4
               with:
-                  dotnet-version: |
-                      8.0.x
-                      9.0.x
-                      10.0.x
+                  dotnet-version: ${{ matrix.dotnet-version }}
+
+            - name: Verify Docker
+              run: docker info
 
             - name: Restore dependencies
               run: dotnet restore GlacialCache.sln
@@ -90,17 +79,21 @@ jobs:
             - name: Run tests
               id: test_run
               continue-on-error: true
-              run: dotnet test GlacialCache.sln --configuration Release --no-restore --verbosity normal --logger "trx;LogFileName=test-results.trx" --collect:"XPlat Code Coverage"
+              run: dotnet test GlacialCache.sln --configuration Release --no-restore --verbosity normal --logger "trx;LogFileName=test-results.trx" --collect:"XPlat Code Coverage" --max-parallel 2
               env:
-                  ConnectionStrings__PostgreSQL: "Host=localhost;Port=5432;Database=glacialcache_test;Username=postgres;Password=postgres"
+                  TESTCONTAINERS_RYUK_DISABLED: false
+                  TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: /var/run/docker.sock
+                  DOCKER_HOST: unix:///var/run/docker.sock
 
             - name: Retry tests on failure
               if: steps.test_run.outcome == 'failure'
               run: |
                   echo "First test run failed, retrying once..."
-                  dotnet test GlacialCache.sln --configuration Release --no-restore --verbosity normal --logger "trx;LogFileName=test-results-retry.trx" --collect:"XPlat Code Coverage"
+                  dotnet test GlacialCache.sln --configuration Release --no-restore --verbosity normal --logger "trx;LogFileName=test-results-retry.trx" --collect:"XPlat Code Coverage" --max-parallel 2
               env:
-                  ConnectionStrings__PostgreSQL: "Host=localhost;Port=5432;Database=glacialcache_test;Username=postgres;Password=postgres"
+                  TESTCONTAINERS_RYUK_DISABLED: false
+                  TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: /var/run/docker.sock
+                  DOCKER_HOST: unix:///var/run/docker.sock
 
             - name: Publish test results
               uses: actions/upload-artifact@v4

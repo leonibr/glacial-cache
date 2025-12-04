@@ -40,6 +40,9 @@ public class MultiInstanceElectionTests : IntegrationTestBase
 
             await _postgres.StartAsync();
             Output.WriteLine($"✅ PostgreSQL container started: {_postgres.GetConnectionString()}");
+
+            // Grant advisory lock permissions for manager election
+            await _postgres.GrantAdvisoryLockPermissionsAsync("testuser", Output);
         }
         catch (Exception ex)
         {

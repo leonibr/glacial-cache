@@ -143,6 +143,9 @@ public class TimeControlledIntegrationTests : IntegrationTestBase
             await using var command6 = new NpgsqlCommand($"GRANT USAGE ON SCHEMA {_schemaName} TO testuser", connection);
             await command6.ExecuteNonQueryAsync();
 
+            // Grant advisory lock permissions for manager election
+            await _postgres.GrantAdvisoryLockPermissionsAsync("testuser", Output);
+
             Output.WriteLine($"✅ Granted CREATE permissions to testuser and created {_schemaName} schema");
         }
         finally
@@ -466,10 +469,10 @@ public class TimeControlledIntegrationTests : IntegrationTestBase
 
         // Test 2: Fast-forward another 45 minutes (total 75 minutes)
         _time.Advance(TimeSpan.FromMinutes(45));
-        
+
         // Wait a bit for cleanup to potentially run
         await Task.Delay(100);
-        
+
         var after75Min = await cache.GetEntryAsync<string>(key);
         // The entry might be cleaned up by the cleanup service, so we'll be more lenient
         if (after75Min == null)

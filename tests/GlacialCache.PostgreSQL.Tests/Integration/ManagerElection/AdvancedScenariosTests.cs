@@ -51,6 +51,9 @@ public class AdvancedScenariosTests : IntegrationTestBase
             await _postgres.StartWithRetryAsync(Output);
             Output.WriteLine($"✅ PostgreSQL container started: {_postgres.GetConnectionString()}");
 
+            // Grant advisory lock permissions for manager election
+            await _postgres.GrantAdvisoryLockPermissionsAsync("testuser", Output);
+
             // Initialize TimeTestHelper for time control in tests
             _timeHelper = TimeTestHelper.CreateForIntegrationTests(_postgres, Output);
         }

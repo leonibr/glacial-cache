@@ -144,7 +144,7 @@ public class TimeControlledIntegrationTests : IntegrationTestBase
             await command6.ExecuteNonQueryAsync();
 
             // Grant advisory lock permissions for manager election
-            await _postgres.GrantAdvisoryLockPermissionsAsync("testuser", Output);
+            await _postgres!.GrantAdvisoryLockPermissionsAsync("testuser", Output);
 
             Output.WriteLine($"✅ Granted CREATE permissions to testuser and created {_schemaName} schema");
         }

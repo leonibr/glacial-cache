@@ -1354,7 +1354,9 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
 
             try
             {
+#pragma warning disable CS8714 
                 var value = _entryFactory.Deserialize<T>(kvp.Value.SerializedData.ToArray());
+#pragma warning restore CS8714 
                 if (value == null)
                 {
                     _logger.LogDeserializationError(kvp.Key, typeof(T).Name, null);

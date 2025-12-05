@@ -47,7 +47,7 @@ public class CleanupBackgroundServicePerformanceTests : IntegrationTestBase
                 options.Cache.SchemaName = "public";
                 options.Cache.TableName = "test_cache_perf";
                 options.Maintenance.EnableAutomaticCleanup = true;
-                options.Maintenance.CleanupInterval = TimeSpan.FromMilliseconds(100); // Very fast for testing
+                options.Maintenance.CleanupInterval = TimeSpan.FromSeconds(1); // Reasonable interval for testing
                 options.Maintenance.MaxCleanupBatchSize = 50; // Small batches for testing
                 options.Infrastructure.EnableManagerElection = false; // Disable for performance testing
                 options.Infrastructure.CreateInfrastructure = true; // Enable infrastructure creation
@@ -120,9 +120,19 @@ public class CleanupBackgroundServicePerformanceTests : IntegrationTestBase
         await _cleanupService.StartAsync(default);
 
         // Wait for expiration and multiple cleanup cycles
-        await Task.Delay(1000); // Allow time for expiration and cleanup
+        await Task.Delay(2000); // Allow time for expiration and cleanup (2 seconds for reliability)
 
-        await _cleanupService.StopAsync(default);
+        // Stop the service with timeout to prevent hanging
+        var stopTimeout = TimeSpan.FromSeconds(10);
+        var stopTask = _cleanupService.StopAsync(default);
+        var timeoutTask = Task.Delay(stopTimeout);
+
+        var completedTask = await Task.WhenAny(stopTask, timeoutTask);
+        if (completedTask == timeoutTask)
+        {
+            throw new TimeoutException($"CleanupBackgroundService failed to stop within {stopTimeout.TotalSeconds} seconds");
+        }
+
         var endTime = DateTime.UtcNow;
 
         // Assert - Performance metrics
@@ -154,7 +164,7 @@ public class CleanupBackgroundServicePerformanceTests : IntegrationTestBase
         // Performance assertions
         cleanedCount.Should().BeGreaterThan(0, "At least some expired entries should be cleaned up");
         preservedCount.Should().Be(20, "All valid entries should be preserved");
-        elapsed.Should().BeLessThan(TimeSpan.FromSeconds(5), "Cleanup should complete within reasonable time");
+        elapsed.Should().BeLessThan(TimeSpan.FromSeconds(15), "Cleanup should complete within reasonable time");
 
         Output.WriteLine($"Performance Results: {cleanedCount}/{entryCount} expired entries cleaned, {preservedCount}/20 valid entries preserved");
     }

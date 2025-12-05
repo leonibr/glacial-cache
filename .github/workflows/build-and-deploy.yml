@@ -99,7 +99,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-results
+          name: test-results-${{ matrix.dotnet-version }}
           path: |
             **/TestResults/**/*.trx
             **/TestResults/**/coverage.cobertura.xml

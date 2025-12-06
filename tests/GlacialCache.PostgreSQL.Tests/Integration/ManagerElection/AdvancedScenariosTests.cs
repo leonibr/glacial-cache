@@ -54,8 +54,8 @@ public class AdvancedScenariosTests : IntegrationTestBase
             // Grant advisory lock permissions for manager election
             await _postgres.GrantAdvisoryLockPermissionsAsync("testuser", Output);
 
-            // Initialize TimeTestHelper for time control in tests
-            _timeHelper = TimeTestHelper.CreateForIntegrationTests(_postgres, Output);
+            // Initialize TimeTestHelper for time control in tests without container sync
+            _timeHelper = TimeTestHelper.CreateForIntegrationTestsWithoutContainerSync(Output);
         }
         catch (Exception ex)
         {

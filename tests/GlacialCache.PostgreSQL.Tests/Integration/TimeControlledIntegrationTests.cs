@@ -38,7 +38,6 @@ public class TimeControlledIntegrationTests : IntegrationTestBase
                 .WithPassword("testpass")
                 .WithEnvironment("TZ", "UTC")
                 .WithCleanUp(true)
-                .WithPrivileged(true)  // Enable privileged mode for time manipulation
                 .Build();
 
             await _postgres.StartAsync();
@@ -47,12 +46,12 @@ public class TimeControlledIntegrationTests : IntegrationTestBase
             _dataSource = NpgsqlDataSource.Create(_postgres.GetConnectionString());
             await GrantTestUserPermissionsAsync();
 
-            // Initialize TimeTestHelper with container sync using factory method
-            _time = TimeTestHelper.CreateForIntegrationTests(_postgres, Output);
+            // Initialize TimeTestHelper without container sync - uses FakeTimeProvider only
+            _time = TimeTestHelper.CreateForIntegrationTestsWithoutContainerSync(Output);
             var initialTime = DateTimeOffset.UtcNow;
             _time.SetTime(initialTime);
 
-            Output.WriteLine($"✅ PostgreSQL container started with time synchronized to {initialTime}: {_postgres.GetConnectionString()}");
+            Output.WriteLine($"✅ PostgreSQL container started with FakeTimeProvider initialized to {initialTime}: {_postgres.GetConnectionString()}");
         }
         catch (Exception ex)
         {

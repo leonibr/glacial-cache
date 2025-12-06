@@ -34,7 +34,6 @@ public class CleanupBackgroundServiceIntegrationTests : IntegrationTestBase
                 .WithUsername("testuser")
                 .WithPassword("testpass")
                 .WithCleanUp(true)
-                .WithPrivileged(true)
                 .Build();
 
             await _postgres.StartAsync();
@@ -42,8 +41,8 @@ public class CleanupBackgroundServiceIntegrationTests : IntegrationTestBase
             // Grant advisory lock permissions for manager election
             await _postgres.GrantAdvisoryLockPermissionsAsync("testuser", Output);
 
-            // Initialize time helper for deterministic time control
-            _timeHelper = TimeTestHelper.CreateForIntegrationTests(_postgres, Output);
+            // Initialize time helper for deterministic time control without container sync
+            _timeHelper = TimeTestHelper.CreateForIntegrationTestsWithoutContainerSync(Output);
 
             var services = new ServiceCollection();
             services.AddLogging(builder =>

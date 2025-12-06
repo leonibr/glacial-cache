@@ -62,7 +62,7 @@ public class TimeTestHelper
         _fakeTimeProvider.Advance(duration);
         if (_enableContainerSync)
         {
-           SetContainerTimeAsync(_fakeTimeProvider.GetUtcNow()).GetAwaiter().GetResult();
+            SetContainerTimeAsync(_fakeTimeProvider.GetUtcNow()).GetAwaiter().GetResult();
         }
         return this;
     }
@@ -143,5 +143,19 @@ public class TimeTestHelper
     {
         var fakeTimeProvider = new FakeTimeProvider(initialTime ?? DateTimeOffset.UtcNow);
         return new TimeTestHelper(fakeTimeProvider, container, output);
+    }
+
+    /// <summary>
+    /// Creates a TimeTestHelper for integration tests without container synchronization.
+    /// This is the recommended approach for most integration tests as it avoids the need
+    /// for privileged containers and eliminates container time manipulation security concerns.
+    /// </summary>
+    /// <param name="output">Test output helper for logging</param>
+    /// <param name="initialTime">Optional initial time. If null, uses current UTC time.</param>
+    /// <returns>A TimeTestHelper configured for integration tests without container sync</returns>
+    public static TimeTestHelper CreateForIntegrationTestsWithoutContainerSync(ITestOutputHelper output, DateTimeOffset? initialTime = null)
+    {
+        var fakeTimeProvider = new FakeTimeProvider(initialTime ?? DateTimeOffset.UtcNow);
+        return new TimeTestHelper(fakeTimeProvider);
     }
 }

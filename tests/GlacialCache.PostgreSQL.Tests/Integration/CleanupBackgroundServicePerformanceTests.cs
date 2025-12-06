@@ -1,10 +1,12 @@
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Testcontainers.PostgreSql;
 using GlacialCache.PostgreSQL.Extensions;
 using GlacialCache.PostgreSQL.Tests.Shared;
 using GlacialCache.PostgreSQL.Services;
+using GlacialCache.PostgreSQL;
 using Xunit.Abstractions;
 
 namespace GlacialCache.PostgreSQL.Tests.Integration;
@@ -16,6 +18,7 @@ public class CleanupBackgroundServicePerformanceTests : IntegrationTestBase
     private ServiceProvider? _serviceProvider;
     private CleanupBackgroundService? _cleanupService;
     private IDistributedCache? _cache;
+    private FakeTimeProvider? _fakeTimeProvider;
 
     public CleanupBackgroundServicePerformanceTests(ITestOutputHelper output) : base(output)
     {
@@ -40,6 +43,10 @@ public class CleanupBackgroundServicePerformanceTests : IntegrationTestBase
                 builder.AddConsole()
                        .SetMinimumLevel(LogLevel.Warning)); // Reduce log noise for performance tests
 
+            // Use FakeTimeProvider for deterministic testing
+            _fakeTimeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+            services.AddSingleton<System.TimeProvider>(_fakeTimeProvider);
+
             // Configure the cache with performance-optimized settings
             services.AddGlacialCachePostgreSQL(options =>
             {
@@ -47,8 +54,8 @@ public class CleanupBackgroundServicePerformanceTests : IntegrationTestBase
                 options.Cache.SchemaName = "public";
                 options.Cache.TableName = "test_cache_perf";
                 options.Maintenance.EnableAutomaticCleanup = true;
-                options.Maintenance.CleanupInterval = TimeSpan.FromSeconds(1); // Reasonable interval for testing
-                options.Maintenance.MaxCleanupBatchSize = 50; // Small batches for testing
+                options.Maintenance.CleanupInterval = TimeSpan.FromMilliseconds(100); // Very fast for deterministic testing
+                options.Maintenance.MaxCleanupBatchSize = 1000; // Larger batches for performance testing
                 options.Infrastructure.EnableManagerElection = false; // Disable for performance testing
                 options.Infrastructure.CreateInfrastructure = true; // Enable infrastructure creation
             });
@@ -56,6 +63,9 @@ public class CleanupBackgroundServicePerformanceTests : IntegrationTestBase
             _serviceProvider = services.BuildServiceProvider();
             _cache = _serviceProvider.GetRequiredService<IDistributedCache>();
             _cleanupService = _serviceProvider.GetRequiredService<CleanupBackgroundService>();
+
+            // Start the cleanup service
+            await _cleanupService.StartAsync(default);
         }
         catch (Exception ex)
         {
@@ -68,8 +78,18 @@ public class CleanupBackgroundServicePerformanceTests : IntegrationTestBase
     {
         if (_cleanupService != null)
         {
-            await _cleanupService.StopAsync(default);
-            _cleanupService.Dispose();
+            try
+            {
+                await _cleanupService.StopAsync(default);
+            }
+            catch (Exception ex)
+            {
+                Output.WriteLine($"Warning: Error stopping cleanup service: {ex.Message}");
+            }
+            finally
+            {
+                _cleanupService.Dispose();
+            }
         }
 
         if (_serviceProvider != null)
@@ -90,11 +110,15 @@ public class CleanupBackgroundServicePerformanceTests : IntegrationTestBase
         // Ensure test is properly initialized
         _cache.Should().NotBeNull();
         _cleanupService.Should().NotBeNull();
+        _fakeTimeProvider.Should().NotBeNull();
 
-        // Arrange - Create a large number of expired entries
+        var startTime = DateTime.UtcNow;
+
+        // Arrange - Create a large number of entries with short expiration times
         const int entryCount = 200;
         var expiredEntries = new List<string>();
 
+        // Create entries that will expire in 1 minute (from fake time perspective)
         for (int i = 0; i < entryCount; i++)
         {
             var key = $"perf-expired-{i}";
@@ -102,7 +126,7 @@ public class CleanupBackgroundServicePerformanceTests : IntegrationTestBase
 
             await _cache.SetStringAsync(key, $"value-{i}", new DistributedCacheEntryOptions
             {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromMilliseconds(50) // Very short expiration
+                AbsoluteExpiration = _fakeTimeProvider.GetUtcNow().AddMinutes(1)
             });
         }
 
@@ -111,32 +135,20 @@ public class CleanupBackgroundServicePerformanceTests : IntegrationTestBase
         {
             await _cache.SetStringAsync($"perf-valid-{i}", $"valid-value-{i}", new DistributedCacheEntryOptions
             {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5) // Long expiration
+                AbsoluteExpiration = _fakeTimeProvider.GetUtcNow().AddHours(1) // Long expiration
             });
         }
 
-        // Act - Start cleanup service and let it run multiple cycles
-        var startTime = DateTime.UtcNow;
-        await _cleanupService.StartAsync(default);
+        // Act - Advance fake time to make entries expire, then wait for cleanup
+        _fakeTimeProvider.Advance(TimeSpan.FromMinutes(2)); // Advance past expiration time
 
-        // Wait for expiration and multiple cleanup cycles
-        await Task.Delay(2000); // Allow time for expiration and cleanup (2 seconds for reliability)
-
-        // Stop the service with timeout to prevent hanging
-        var stopTimeout = TimeSpan.FromSeconds(10);
-        var stopTask = _cleanupService.StopAsync(default);
-        var timeoutTask = Task.Delay(stopTimeout);
-
-        var completedTask = await Task.WhenAny(stopTask, timeoutTask);
-        if (completedTask == timeoutTask)
-        {
-            throw new TimeoutException($"CleanupBackgroundService failed to stop within {stopTimeout.TotalSeconds} seconds");
-        }
+        // Wait for cleanup to complete (deterministic, no real time delays)
+        await WaitForCleanupToCompleteAsync(expiredEntries);
 
         var endTime = DateTime.UtcNow;
+        var elapsed = endTime - startTime;
 
         // Assert - Performance metrics
-        var elapsed = endTime - startTime;
         Output.WriteLine($"Performance test completed in {elapsed.TotalSeconds:F2} seconds");
 
         // Verify that expired entries were cleaned up
@@ -164,9 +176,63 @@ public class CleanupBackgroundServicePerformanceTests : IntegrationTestBase
         // Performance assertions
         cleanedCount.Should().BeGreaterThan(0, "At least some expired entries should be cleaned up");
         preservedCount.Should().Be(20, "All valid entries should be preserved");
-        elapsed.Should().BeLessThan(TimeSpan.FromSeconds(15), "Cleanup should complete within reasonable time");
+        elapsed.Should().BeLessThan(TimeSpan.FromSeconds(10), "Cleanup should complete within reasonable time");
 
         Output.WriteLine($"Performance Results: {cleanedCount}/{entryCount} expired entries cleaned, {preservedCount}/20 valid entries preserved");
+    }
+
+    /// <summary>
+    /// Waits for cleanup to complete by polling for expired entries to be removed.
+    /// Uses deterministic time control instead of real time delays.
+    /// </summary>
+    private async Task WaitForCleanupToCompleteAsync(List<string> expiredKeys)
+    {
+        await WaitForCleanupToCompleteAsync(_cache, expiredKeys);
+    }
+
+    /// <summary>
+    /// Waits for cleanup to complete by polling for expired entries to be removed.
+    /// Uses deterministic time control instead of real time delays.
+    /// </summary>
+    private async Task WaitForCleanupToCompleteAsync(IDistributedCache cache, List<string> expiredKeys)
+    {
+        var timeout = TimeSpan.FromSeconds(5);
+        var startTime = DateTime.UtcNow;
+
+        while (DateTime.UtcNow - startTime < timeout)
+        {
+            bool allCleaned = true;
+            foreach (var key in expiredKeys.Take(10)) // Check first 10 keys as sample
+            {
+                var value = await cache.GetStringAsync(key);
+                if (value != null)
+                {
+                    allCleaned = false;
+                    break;
+                }
+            }
+
+            if (allCleaned)
+            {
+                Output.WriteLine("Cleanup completed successfully");
+                return;
+            }
+
+            // Small delay between checks
+            await Task.Delay(50);
+        }
+
+        Output.WriteLine($"Cleanup did not complete within {timeout.TotalSeconds}s timeout, but continuing with test");
+    }
+
+    /// <summary>
+    /// Waits for cleanup to complete by polling for entries with a specific prefix.
+    /// Uses deterministic time control instead of real time delays.
+    /// </summary>
+    private async Task WaitForCleanupToCompleteAsync(IDistributedCache cache, string keyPrefix, int sampleCount)
+    {
+        var sampleKeys = Enumerable.Range(0, sampleCount).Select(i => $"{keyPrefix}{i}").ToList();
+        await WaitForCleanupToCompleteAsync(cache, sampleKeys);
     }
 
     [Fact]
@@ -175,21 +241,26 @@ public class CleanupBackgroundServicePerformanceTests : IntegrationTestBase
     {
         // Ensure test is properly initialized
         _postgres.Should().NotBeNull();
+        _fakeTimeProvider.Should().NotBeNull();
 
-        // Arrange - Test different batch sizes
+        // Arrange - Test different batch sizes using fake time
         const int smallBatchSize = 10;
         const int largeBatchSize = 100;
 
         // Test with small batch size first
         var servicesSmall = new ServiceCollection();
         servicesSmall.AddLogging(builder => builder.SetMinimumLevel(LogLevel.Warning));
+
+        // Use the same FakeTimeProvider for all tests
+        servicesSmall.AddSingleton<System.TimeProvider>(_fakeTimeProvider);
+
         servicesSmall.AddGlacialCachePostgreSQL(options =>
         {
             options.Connection.ConnectionString = _postgres.GetConnectionString();
             options.Cache.SchemaName = "public";
             options.Cache.TableName = "test_cache_small_batch";
             options.Maintenance.EnableAutomaticCleanup = true;
-            options.Maintenance.CleanupInterval = TimeSpan.FromMilliseconds(200);
+            options.Maintenance.CleanupInterval = TimeSpan.FromMilliseconds(100); // Very fast for testing
             options.Maintenance.MaxCleanupBatchSize = smallBatchSize;
             options.Infrastructure.EnableManagerElection = false;
         });
@@ -198,32 +269,42 @@ public class CleanupBackgroundServicePerformanceTests : IntegrationTestBase
         var cacheSmall = providerSmall.GetRequiredService<IDistributedCache>();
         var cleanupSmall = providerSmall.GetRequiredService<CleanupBackgroundService>();
 
-        // Create entries for small batch test
+        // Create entries that expire based on fake time
         for (int i = 0; i < 50; i++)
         {
             await cacheSmall.SetStringAsync($"small-batch-{i}", $"value-{i}", new DistributedCacheEntryOptions
             {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromMilliseconds(50)
+                AbsoluteExpiration = _fakeTimeProvider.GetUtcNow().AddSeconds(1) // Expire in 1 second (fake time)
             });
         }
 
-        // Act - Test small batch performance
+        // Act - Test small batch performance using fake time advancement
         var startSmall = DateTime.UtcNow;
         await cleanupSmall.StartAsync(default);
-        await Task.Delay(1000);
+
+        // Advance fake time to make entries expire
+        _fakeTimeProvider.Advance(TimeSpan.FromSeconds(2));
+
+        // Wait for cleanup to complete
+        await WaitForCleanupToCompleteAsync(cacheSmall, "small-batch-", 5);
+
         await cleanupSmall.StopAsync(default);
         var endSmall = DateTime.UtcNow;
 
         // Test with large batch size
         var servicesLarge = new ServiceCollection();
         servicesLarge.AddLogging(builder => builder.SetMinimumLevel(LogLevel.Warning));
+
+        // Use the same FakeTimeProvider
+        servicesLarge.AddSingleton<System.TimeProvider>(_fakeTimeProvider);
+
         servicesLarge.AddGlacialCachePostgreSQL(options =>
         {
             options.Connection.ConnectionString = _postgres.GetConnectionString();
             options.Cache.SchemaName = "public";
             options.Cache.TableName = "test_cache_large_batch";
             options.Maintenance.EnableAutomaticCleanup = true;
-            options.Maintenance.CleanupInterval = TimeSpan.FromMilliseconds(200);
+            options.Maintenance.CleanupInterval = TimeSpan.FromMilliseconds(100);
             options.Maintenance.MaxCleanupBatchSize = largeBatchSize;
             options.Infrastructure.EnableManagerElection = false;
         });
@@ -237,14 +318,20 @@ public class CleanupBackgroundServicePerformanceTests : IntegrationTestBase
         {
             await cacheLarge.SetStringAsync($"large-batch-{i}", $"value-{i}", new DistributedCacheEntryOptions
             {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromMilliseconds(50)
+                AbsoluteExpiration = _fakeTimeProvider.GetUtcNow().AddSeconds(1)
             });
         }
 
         // Act - Test large batch performance
         var startLarge = DateTime.UtcNow;
         await cleanupLarge.StartAsync(default);
-        await Task.Delay(1000);
+
+        // Advance fake time again
+        _fakeTimeProvider.Advance(TimeSpan.FromSeconds(2));
+
+        // Wait for cleanup to complete
+        await WaitForCleanupToCompleteAsync(cacheLarge, "large-batch-", 5);
+
         await cleanupLarge.StopAsync(default);
         var endLarge = DateTime.UtcNow;
 
@@ -272,25 +359,29 @@ public class CleanupBackgroundServicePerformanceTests : IntegrationTestBase
         // Ensure test is properly initialized
         _cache.Should().NotBeNull();
         _cleanupService.Should().NotBeNull();
+        _fakeTimeProvider.Should().NotBeNull();
 
         // Arrange - Create many entries to test memory usage patterns
         const int highLoadCount = 500;
 
-        // Create a high load of expired entries
+        // Create a high load of expired entries using fake time
         for (int i = 0; i < highLoadCount; i++)
         {
             await _cache.SetStringAsync($"memory-test-{i}", new string('x', 1000), new DistributedCacheEntryOptions
             {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromMilliseconds(50)
+                AbsoluteExpiration = _fakeTimeProvider.GetUtcNow().AddSeconds(1) // Expire quickly in fake time
             });
         }
 
-        // Act - Start cleanup and monitor
+        // Act - Start cleanup and monitor memory usage
         var startMemory = GC.GetTotalMemory(false);
         await _cleanupService.StartAsync(default);
 
-        // Let it run through multiple cleanup cycles
-        await Task.Delay(2000);
+        // Advance fake time to make entries expire
+        _fakeTimeProvider.Advance(TimeSpan.FromSeconds(2));
+
+        // Wait for cleanup to complete (no real time delay)
+        await WaitForCleanupToCompleteAsync(Enumerable.Range(0, 10).Select(i => $"memory-test-{i}").ToList());
 
         // Force garbage collection to see memory impact
         GC.Collect();

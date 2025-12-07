@@ -72,6 +72,8 @@ public sealed class GlacialCacheStressTests : UnitIntegrationTestBase, IAsyncDis
 
             static async Task<long> RunWorkloadAsync(IDistributedCache cache, string keyPrefix)
             {
+                GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, true, true);
+
                 var initialMemory = GC.GetTotalMemory(true);
 
                 for (int i = 0; i < 10000; i++)

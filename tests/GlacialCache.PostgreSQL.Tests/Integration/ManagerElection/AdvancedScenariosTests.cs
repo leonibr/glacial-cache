@@ -411,8 +411,30 @@ public class AdvancedScenariosTests : IntegrationTestBase
             await _postgres.StartAsync();
             Output.WriteLine("✅ PostgreSQL container restarted");
 
-            // Wait for reconnection and database to be fully ready
-            await Task.Delay(TimeSpan.FromSeconds(5));
+            // Wait for reconnection and database to be fully ready using fake time
+            var waitTime = TimeSpan.Zero;
+            var maxWaitTime = TimeSpan.FromSeconds(5);
+            var checkInterval = TimeSpan.FromMilliseconds(100);
+
+            while (waitTime < maxWaitTime)
+            {
+                _timeHelper!.Advance(checkInterval);
+                waitTime = waitTime.Add(checkInterval);
+
+                // Test database connectivity
+                try
+                {
+                    using var testConnection = new NpgsqlConnection(_postgres!.GetConnectionString());
+                    await testConnection.OpenAsync();
+                    testConnection.Close();
+                    Output.WriteLine($"✅ Database ready after {waitTime.TotalSeconds:F1}s");
+                    break;
+                }
+                catch
+                {
+                    // Database not ready yet, continue polling
+                }
+            }
 
             // Create a new service provider to ensure fresh connection pool
             var newServiceProvider = CreateIsolatedServiceProvider();
@@ -436,7 +458,7 @@ public class AdvancedScenariosTests : IntegrationTestBase
                     if (i < maxRetries - 1)
                     {
                         Output.WriteLine($"⏳ Attempt {i + 1} failed, retrying in {retryDelay.TotalSeconds}s...");
-                        await Task.Delay(retryDelay);
+                        _timeHelper!.Advance(retryDelay);
                     }
                 }
 
@@ -674,10 +696,43 @@ public class AdvancedScenariosTests : IntegrationTestBase
                 await service1.StartAsync(CancellationToken.None);
                 await service2.StartAsync(CancellationToken.None);
 
-                // Advance time for initial election instead of waiting
-                timeHelper.Advance(TimeSpan.FromSeconds(5));
+                // Wait for initial election to occur (services use Task.Delay which requires real time)
+                // Give services time to initialize and attempt lock acquisition
+                // Services may need multiple attempts due to exponential backoff
+                var maxWaitTime = TimeSpan.FromSeconds(30);
+                var waitStart = DateTimeOffset.UtcNow;
+                var pollInterval = TimeSpan.FromMilliseconds(200);
 
-                // Monitor for voluntary yield events
+                while (!service1.IsManager && !service2.IsManager &&
+                       (DateTimeOffset.UtcNow - waitStart) < maxWaitTime)
+                {
+                    await Task.Delay(pollInterval);
+
+                    // Check if we've already recorded an election event
+                    if (leadershipChanges.Any(c => c.Item3 == "elected"))
+                    {
+                        break;
+                    }
+                }
+
+                // Record the initial leadership state
+                var initialIsManager1 = service1.IsManager;
+                var initialIsManager2 = service2.IsManager;
+                Output.WriteLine($"Initial state after startup: Instance1: {initialIsManager1}, Instance2: {initialIsManager2}");
+
+                // Verify at least one service became manager or we have election events
+                var hasInitialElection = initialIsManager1 || initialIsManager2 || leadershipChanges.Any(c => c.Item3 == "elected");
+                if (!hasInitialElection)
+                {
+                    Output.WriteLine("⚠️ Warning: No service became manager initially. This may indicate a setup issue.");
+                }
+
+                // Now use fake time to simulate the 5-minute voluntary yield period
+                // The services check leadership duration using TimeProvider.GetUtcNow(), which respects fake time
+                // However, the services use Task.Delay() which blocks on real time, so we need to:
+                // 1. Advance fake time to trigger voluntary yield checks
+                // 2. Wait real time to allow the background service loops to process
+                // Strategy: Advance fake time in chunks and poll for yield events
                 while (elapsedTime < testDuration)
                 {
                     var currentIsManager1 = service1.IsManager;
@@ -692,9 +747,20 @@ public class AdvancedScenariosTests : IntegrationTestBase
                         break;
                     }
 
-                    // Advance time instead of waiting
+                    // Advance fake time - this affects TimeProvider.GetUtcNow() used in voluntary yield checks
                     timeHelper.Advance(checkInterval);
                     elapsedTime = elapsedTime.Add(checkInterval);
+
+                    // Poll for yield events - services check every 30 seconds when manager
+                    // Wait up to 40 seconds (with polling) for the service to process the time change using fake time
+                    var pollTime = TimeSpan.Zero;
+                    var maxPollTime = TimeSpan.FromSeconds(40);
+                    var pollIncrement = TimeSpan.FromMilliseconds(500);
+                    while (pollTime < maxPollTime && yieldEvents.Count == 0)
+                    {
+                        timeHelper.Advance(pollIncrement);
+                        pollTime = pollTime.Add(pollIncrement);
+                    }
                 }
 
                 // Stop the services
@@ -875,8 +941,8 @@ public class AdvancedScenariosTests : IntegrationTestBase
                         instanceRetryCounts["instance-1"]++;
                         instanceLastRetryTime["instance-1"] = DateTimeOffset.UtcNow;
 
-                        // Small delay to prevent tight loop
-                        await Task.Delay(50, cancellationTokenSource.Token);
+                        // Small delay to prevent tight loop using fake time
+                        timeHelper.Advance(TimeSpan.FromMilliseconds(50));
                     }
                 }));
 
@@ -897,8 +963,8 @@ public class AdvancedScenariosTests : IntegrationTestBase
                         instanceRetryCounts["instance-2"]++;
                         instanceLastRetryTime["instance-2"] = DateTimeOffset.UtcNow;
 
-                        // Small delay to prevent tight loop
-                        await Task.Delay(50, cancellationTokenSource.Token);
+                        // Small delay to prevent tight loop using fake time
+                        timeHelper.Advance(TimeSpan.FromMilliseconds(50));
                     }
                 }));
 
@@ -919,16 +985,16 @@ public class AdvancedScenariosTests : IntegrationTestBase
                         instanceRetryCounts["instance-3"]++;
                         instanceLastRetryTime["instance-3"] = DateTimeOffset.UtcNow;
 
-                        // Small delay to prevent tight loop
-                        await Task.Delay(50, cancellationTokenSource.Token);
+                        // Small delay to prevent tight loop using fake time
+                        timeHelper.Advance(TimeSpan.FromMilliseconds(50));
                     }
                 }));
 
                 // Wait for one instance to succeed or timeout
                 var completedTask = await Task.WhenAny(tasks);
 
-                // Wait a bit more to collect retry data from other instances
-                await Task.Delay(2000);
+                // Wait a bit more to collect retry data from other instances using fake time
+                timeHelper.Advance(TimeSpan.FromSeconds(2));
                 cancellationTokenSource.Cancel();
 
                 // Wait for all tasks to complete

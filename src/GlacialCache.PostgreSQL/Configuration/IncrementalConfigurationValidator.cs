@@ -12,6 +12,7 @@ public class IncrementalConfigurationValidator
     private readonly Dictionary<string, ValidationResult[]> _validationCache = new();
     private readonly ReaderWriterLockSlim _validationLock = new();
     private readonly ILogger<IncrementalConfigurationValidator> _logger;
+    private const int MaxCacheSize = 100; // Limit cache size to prevent memory leaks
 
     public IncrementalConfigurationValidator(ILogger<IncrementalConfigurationValidator> logger)
     {
@@ -49,6 +50,18 @@ public class IncrementalConfigurationValidator
             _validationCache[cacheKey] = results;
             _logger.LogDebug("Cached validation results for section: {Section}, found {ErrorCount} errors",
                 section ?? "full", results.Length);
+
+            // Enforce cache size limit to prevent memory leaks
+            if (_validationCache.Count > MaxCacheSize)
+            {
+                // Remove oldest entries (simple LRU by clearing half the cache)
+                var keysToRemove = _validationCache.Keys.Take(_validationCache.Count / 2).ToList();
+                foreach (var key in keysToRemove)
+                {
+                    _validationCache.Remove(key);
+                }
+                _logger.LogDebug("Cleaned up validation cache, removed {RemovedCount} entries", keysToRemove.Count);
+            }
 
             return results;
         }

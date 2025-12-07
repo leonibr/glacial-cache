@@ -79,7 +79,9 @@ jobs:
       - name: Run tests
         id: test_run
         continue-on-error: true
-        run: dotnet test GlacialCache.sln --configuration Release --no-restore --verbosity normal --logger "trx;LogFileName=test-results.trx" --collect:"XPlat Code Coverage"
+        run: |
+          FRAMEWORK=$(echo "${{ matrix.dotnet-version }}" | cut -d. -f1)
+          dotnet test GlacialCache.sln --configuration Release --no-restore --verbosity normal --framework "net${FRAMEWORK}.0" --logger "trx;LogFileName=test-results.trx" --collect:"XPlat Code Coverage"
         env:
           TESTCONTAINERS_RYUK_DISABLED: false
           TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: /var/run/docker.sock
@@ -89,7 +91,8 @@ jobs:
         if: steps.test_run.outcome == 'failure'
         run: |
           echo "First test run failed, retrying once..."
-          dotnet test GlacialCache.sln --configuration Release --no-restore --verbosity normal --logger "trx;LogFileName=test-results-retry.trx" --collect:"XPlat Code Coverage"
+          FRAMEWORK=$(echo "${{ matrix.dotnet-version }}" | cut -d. -f1)
+          dotnet test GlacialCache.sln --configuration Release --no-restore --verbosity normal --framework "net${FRAMEWORK}.0" --logger "trx;LogFileName=test-results-retry.trx" --collect:"XPlat Code Coverage"
         env:
           TESTCONTAINERS_RYUK_DISABLED: false
           TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: /var/run/docker.sock
@@ -132,13 +135,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup .NET
+      - name: Setup .NET 8.0
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: |
-            8.0.x
-            9.0.x
-            10.0.x
+          dotnet-version: "8.0.x"
+
+      - name: Setup .NET 9.0
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Setup .NET 10.0
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
 
       - name: Determine version
         id: version

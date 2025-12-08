@@ -26,7 +26,14 @@ jobs:
             - uses: actions/setup-dotnet@v4
               with:
                   dotnet-version: ${{ matrix.dotnet-version }}
-                  cache: true
+
+            - name: Cache NuGet packages
+              uses: actions/cache@v4
+              with:
+                  path: ~/.nuget/packages
+                  key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+                  restore-keys: |
+                      ${{ runner.os }}-nuget-
 
             - run: dotnet restore GlacialCache.sln
             - run: dotnet build GlacialCache.sln --configuration Release --no-restore

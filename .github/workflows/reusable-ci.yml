@@ -1,0 +1,83 @@
+name: Reusable CI
+
+on:
+    workflow_call:
+
+env:
+    DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+    DOTNET_CLI_TELEMETRY_OPTOUT: true
+    DOTNET_NOLOGO: true
+
+permissions:
+    contents: read
+    pull-requests: write
+
+jobs:
+    build_test:
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                dotnet-version: ["8.0.x", "9.0.x", "10.0.x"]
+        steps:
+            - uses: actions/checkout@v4
+              with: { fetch-depth: 0 }
+
+            - uses: actions/setup-dotnet@v4
+              with:
+                  dotnet-version: ${{ matrix.dotnet-version }}
+                  cache: true
+
+            - run: dotnet restore GlacialCache.sln
+            - run: dotnet build GlacialCache.sln --configuration Release --no-restore
+
+            - name: Verify Docker
+              run: docker info
+
+            - name: Run tests
+              id: test_run
+              continue-on-error: true
+              run: |
+                  FRAMEWORK=$(echo "${{ matrix.dotnet-version }}" | cut -d. -f1)
+                  dotnet test GlacialCache.sln --configuration Release --no-restore --verbosity normal --framework "net${FRAMEWORK}.0" --logger "trx;LogFileName=test-results.trx" --collect:"XPlat Code Coverage"
+              env:
+                  TESTCONTAINERS_RYUK_DISABLED: false
+                  TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: /var/run/docker.sock
+                  DOCKER_HOST: unix:///var/run/docker.sock
+
+            - name: Retry tests on failure
+              if: steps.test_run.outcome == 'failure'
+              run: |
+                  echo "First test run failed, retrying once..."
+                  FRAMEWORK=$(echo "${{ matrix.dotnet-version }}" | cut -d. -f1)
+                  dotnet test GlacialCache.sln --configuration Release --no-restore --verbosity normal --framework "net${FRAMEWORK}.0" --logger "trx;LogFileName=test-results-retry.trx" --collect:"XPlat Code Coverage"
+              env:
+                  TESTCONTAINERS_RYUK_DISABLED: false
+                  TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: /var/run/docker.sock
+                  DOCKER_HOST: unix:///var/run/docker.sock
+
+            - name: Publish test results
+              uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                  name: test-results-${{ matrix.dotnet-version }}
+                  path: |
+                      **/TestResults/**/*.trx
+                      **/TestResults/**/coverage.cobertura.xml
+                  retention-days: 30
+
+            - name: Coverage summary
+              if: always()
+              uses: irongut/CodeCoverageSummary@v1.3.0
+              with:
+                  filename: "**/TestResults/**/coverage.cobertura.xml"
+                  badge: true
+                  format: markdown
+                  output: both
+
+            - name: PR coverage comment
+              if: github.event_name == 'pull_request'
+              uses: marocchino/sticky-pull-request-comment@v2
+              with:
+                  recreate: true
+                  path: code-coverage-results.md

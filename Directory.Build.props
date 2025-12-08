@@ -1,0 +1,9 @@
+<Project>
+    <PropertyGroup>
+        <!-- Enable NuGet package lock files -->
+        <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+        <!-- Lock file location: at solution root -->
+        <NuGetLockFilePath>$(MSBuildThisFileDirectory)packages.lock.json</NuGetLockFilePath>
+    </PropertyGroup>
+</Project>
+

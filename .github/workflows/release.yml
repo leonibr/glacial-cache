@@ -51,6 +51,11 @@ jobs:
 
       - run: dotnet restore src/GlacialCache.PostgreSQL/GlacialCache.PostgreSQL.csproj
 
+      - run:
+          dotnet build src/GlacialCache.PostgreSQL/GlacialCache.PostgreSQL.csproj \
+          --configuration Release \
+          --no-restore
+
       - run: |
           dotnet pack src/GlacialCache.PostgreSQL/GlacialCache.PostgreSQL.csproj \
             --configuration Release \

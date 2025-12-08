@@ -918,8 +918,19 @@ public class AdvancedScenariosTests : IntegrationTestBase
                 var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(20));
 
                 // Track retry attempts and timing
-                var instanceRetryCounts = new Dictionary<string, int>();
-                var instanceLastRetryTime = new Dictionary<string, DateTimeOffset>();
+                // Initialize all entries upfront to avoid race conditions
+                var instanceRetryCounts = new Dictionary<string, int>
+                {
+                    ["instance-1"] = 0,
+                    ["instance-2"] = 0,
+                    ["instance-3"] = 0
+                };
+                var instanceLastRetryTime = new Dictionary<string, DateTimeOffset>
+                {
+                    ["instance-1"] = DateTimeOffset.UtcNow,
+                    ["instance-2"] = DateTimeOffset.UtcNow,
+                    ["instance-3"] = DateTimeOffset.UtcNow
+                };
 
                 // Start all three instances competing for the lock
                 var tasks = new List<Task>();
@@ -927,66 +938,78 @@ public class AdvancedScenariosTests : IntegrationTestBase
                 // Instance 1 task
                 tasks.Add(Task.Run(async () =>
                 {
-                    instanceRetryCounts["instance-1"] = 0;
-                    instanceLastRetryTime["instance-1"] = DateTimeOffset.UtcNow;
-
-                    while (!cancellationTokenSource.Token.IsCancellationRequested)
+                    try
                     {
-                        var acquired = await service1.TryAcquireManagerRoleAsync(cancellationTokenSource.Token);
-                        if (acquired)
+                        while (!cancellationTokenSource.Token.IsCancellationRequested)
                         {
-                            Output.WriteLine($"Instance 1 acquired lock after {instanceRetryCounts["instance-1"]} retries");
-                            break;
-                        }
-                        instanceRetryCounts["instance-1"]++;
-                        instanceLastRetryTime["instance-1"] = DateTimeOffset.UtcNow;
+                            var acquired = await service1.TryAcquireManagerRoleAsync(cancellationTokenSource.Token);
+                            if (acquired)
+                            {
+                                Output.WriteLine($"Instance 1 acquired lock after {instanceRetryCounts["instance-1"]} retries");
+                                break;
+                            }
+                            instanceRetryCounts["instance-1"]++;
+                            instanceLastRetryTime["instance-1"] = DateTimeOffset.UtcNow;
 
-                        // Small delay to prevent tight loop using fake time
-                        timeHelper.Advance(TimeSpan.FromMilliseconds(50));
+                            // Small delay to prevent tight loop using fake time
+                            timeHelper.Advance(TimeSpan.FromMilliseconds(50));
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Expected when cancellation token is triggered
                     }
                 }));
 
                 // Instance 2 task
                 tasks.Add(Task.Run(async () =>
                 {
-                    instanceRetryCounts["instance-2"] = 0;
-                    instanceLastRetryTime["instance-2"] = DateTimeOffset.UtcNow;
-
-                    while (!cancellationTokenSource.Token.IsCancellationRequested)
+                    try
                     {
-                        var acquired = await service2.TryAcquireManagerRoleAsync(cancellationTokenSource.Token);
-                        if (acquired)
+                        while (!cancellationTokenSource.Token.IsCancellationRequested)
                         {
-                            Output.WriteLine($"Instance 2 acquired lock after {instanceRetryCounts["instance-2"]} retries");
-                            break;
-                        }
-                        instanceRetryCounts["instance-2"]++;
-                        instanceLastRetryTime["instance-2"] = DateTimeOffset.UtcNow;
+                            var acquired = await service2.TryAcquireManagerRoleAsync(cancellationTokenSource.Token);
+                            if (acquired)
+                            {
+                                Output.WriteLine($"Instance 2 acquired lock after {instanceRetryCounts["instance-2"]} retries");
+                                break;
+                            }
+                            instanceRetryCounts["instance-2"]++;
+                            instanceLastRetryTime["instance-2"] = DateTimeOffset.UtcNow;
 
-                        // Small delay to prevent tight loop using fake time
-                        timeHelper.Advance(TimeSpan.FromMilliseconds(50));
+                            // Small delay to prevent tight loop using fake time
+                            timeHelper.Advance(TimeSpan.FromMilliseconds(50));
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Expected when cancellation token is triggered
                     }
                 }));
 
                 // Instance 3 task
                 tasks.Add(Task.Run(async () =>
                 {
-                    instanceRetryCounts["instance-3"] = 0;
-                    instanceLastRetryTime["instance-3"] = DateTimeOffset.UtcNow;
-
-                    while (!cancellationTokenSource.Token.IsCancellationRequested)
+                    try
                     {
-                        var acquired = await service3.TryAcquireManagerRoleAsync(cancellationTokenSource.Token);
-                        if (acquired)
+                        while (!cancellationTokenSource.Token.IsCancellationRequested)
                         {
-                            Output.WriteLine($"Instance 3 acquired lock after {instanceRetryCounts["instance-3"]} retries");
-                            break;
-                        }
-                        instanceRetryCounts["instance-3"]++;
-                        instanceLastRetryTime["instance-3"] = DateTimeOffset.UtcNow;
+                            var acquired = await service3.TryAcquireManagerRoleAsync(cancellationTokenSource.Token);
+                            if (acquired)
+                            {
+                                Output.WriteLine($"Instance 3 acquired lock after {instanceRetryCounts["instance-3"]} retries");
+                                break;
+                            }
+                            instanceRetryCounts["instance-3"]++;
+                            instanceLastRetryTime["instance-3"] = DateTimeOffset.UtcNow;
 
-                        // Small delay to prevent tight loop using fake time
-                        timeHelper.Advance(TimeSpan.FromMilliseconds(50));
+                            // Small delay to prevent tight loop using fake time
+                            timeHelper.Advance(TimeSpan.FromMilliseconds(50));
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Expected when cancellation token is triggered
                     }
                 }));
 

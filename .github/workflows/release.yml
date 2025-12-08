@@ -16,6 +16,9 @@ concurrency:
 jobs:
     ci:
         uses: ./.github/workflows/reusable-ci.yml
+        permissions:
+            contents: read
+            pull-requests: write
 
     package:
         needs: ci

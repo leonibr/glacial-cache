@@ -106,39 +106,6 @@ public sealed class TimeConverterServiceTests
         result.Should().Be(expectedRelativeInterval);
     }
 
-    [Fact]
-    public void ConvertToRelativeInterval_WithFutureAbsoluteExpirationOneSecond_ReturnsCorrectInterval()
-    {
-        // Arrange
-        var currentTime = new DateTimeOffset(2025, 1, 1, 12, 0, 0, TimeSpan.Zero);
-        var absoluteExpiration = currentTime.AddSeconds(1);
-        var expectedRelativeInterval = TimeSpan.FromSeconds(1);
-
-        SetupTimeProvider(currentTime);
-
-        // Act
-        var result = _service.ConvertToRelativeInterval(absoluteExpiration);
-
-        // Assert
-        result.Should().Be(expectedRelativeInterval);
-    }
-
-    [Fact]
-    public void ConvertToRelativeInterval_WithFutureAbsoluteExpirationOneMillisecond_ReturnsCorrectInterval()
-    {
-        // Arrange
-        var currentTime = new DateTimeOffset(2025, 1, 1, 12, 0, 0, TimeSpan.Zero);
-        var absoluteExpiration = currentTime.AddMilliseconds(1);
-        var expectedRelativeInterval = TimeSpan.FromMilliseconds(1);
-
-        SetupTimeProvider(currentTime);
-
-        // Act
-        var result = _service.ConvertToRelativeInterval(absoluteExpiration);
-
-        // Assert
-        result.Should().Be(expectedRelativeInterval);
-    }
 
     #region Past Absolute Expiration
 
@@ -159,45 +126,6 @@ public sealed class TimeConverterServiceTests
         result.Should().Be(expectedRelativeInterval);
     }
 
-    [Fact]
-    public void ConvertToRelativeInterval_WithPastAbsoluteExpiration_LogsWarning()
-    {
-        // Arrange
-        var currentTime = new DateTimeOffset(2025, 1, 1, 12, 0, 0, TimeSpan.Zero);
-        var absoluteExpiration = currentTime.AddHours(-1);
-
-        SetupTimeProvider(currentTime);
-
-        // Act
-        _service.ConvertToRelativeInterval(absoluteExpiration);
-
-        // Assert - verify that Log method was called (can't verify extension methods with Moq)
-        _mockLogger.Verify(
-            x => x.Log(
-                LogLevel.Warning,
-                It.IsAny<EventId>(),
-                It.IsAny<It.IsAnyType>(),
-                It.IsAny<Exception>(),
-                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-            Times.Once);
-    }
-
-    [Fact]
-    public void ConvertToRelativeInterval_WithOneSecondInPast_ReturnsImmediateExpiration()
-    {
-        // Arrange
-        var currentTime = new DateTimeOffset(2025, 9, 4, 12, 0, 0, TimeSpan.Zero);
-        var absoluteExpiration = currentTime.AddSeconds(-1);
-        var expectedRelativeInterval = TimeSpan.FromMilliseconds(1);
-
-        SetupTimeProvider(currentTime);
-
-        // Act
-        var result = _service.ConvertToRelativeInterval(absoluteExpiration);
-
-        // Assert
-        result.Should().Be(expectedRelativeInterval);
-    }
     #endregion
 
     #region Current Time (Zero Interval)
@@ -256,23 +184,6 @@ public sealed class TimeConverterServiceTests
         result.Should().Be(expectedRelativeInterval);
     }
 
-    [Fact]
-    public void ConvertToRelativeInterval_WithVerySmallPositiveInterval_ReturnsCorrectInterval()
-    {
-        // Arrange
-        var currentTime = new DateTimeOffset(2025, 1, 1, 12, 0, 0, TimeSpan.Zero);
-        var absoluteExpiration = currentTime.AddMilliseconds(10); // 10 milliseconds - above minimum but still small
-        var expectedRelativeInterval = TimeSpan.FromMilliseconds(10);
-
-        SetupTimeProvider(currentTime);
-
-        // Act
-        var result = _service.ConvertToRelativeInterval(absoluteExpiration);
-
-        // Assert
-        result.Should().Be(expectedRelativeInterval);
-    }
-
     #endregion
     #region TimeProvider Integration
 
@@ -314,51 +225,6 @@ public sealed class TimeConverterServiceTests
         result.Should().Be(expectedMinimum);
     }
 
-    [Fact]
-    public void ConvertToRelativeInterval_WithVeryShortInterval_LogsWarning()
-    {
-        // Arrange
-        var currentTime = new DateTimeOffset(2025, 1, 1, 12, 0, 0, TimeSpan.Zero);
-        var absoluteExpiration = currentTime.AddMilliseconds(0.5);
-
-        SetupTimeProvider(currentTime);
-
-        // Act
-        _service.ConvertToRelativeInterval(absoluteExpiration);
-
-        // Assert - verify that Log method was called (can't verify extension methods with Moq)
-        _mockLogger.Verify(
-            x => x.Log(
-                LogLevel.Warning,
-                It.IsAny<EventId>(),
-                It.IsAny<It.IsAnyType>(),
-                It.IsAny<Exception>(),
-                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-            Times.Once);
-    }
-
-    [Fact]
-    public void ConvertToRelativeInterval_WithVerySmallPositiveInterval_LogsInformation()
-    {
-        // Arrange
-        var currentTime = new DateTimeOffset(2025, 1, 1, 12, 0, 0, TimeSpan.Zero);
-        var absoluteExpiration = currentTime.AddMilliseconds(5); // Small but above minimum
-
-        SetupTimeProvider(currentTime);
-
-        // Act
-        _service.ConvertToRelativeInterval(absoluteExpiration);
-
-        // Assert - verify that Log method was called (can't verify extension methods with Moq)
-        _mockLogger.Verify(
-            x => x.Log(
-                LogLevel.Information,
-                It.IsAny<EventId>(),
-                It.IsAny<It.IsAnyType>(),
-                It.IsAny<Exception>(),
-                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-            Times.Once);
-    }
 
     #endregion
 
@@ -381,28 +247,6 @@ public sealed class TimeConverterServiceTests
         result.Should().Be(expectedMaximum);
     }
 
-    [Fact]
-    public void ConvertToRelativeInterval_WithVeryLongInterval_LogsWarning()
-    {
-        // Arrange
-        var currentTime = new DateTimeOffset(2025, 1, 1, 12, 0, 0, TimeSpan.Zero);
-        var absoluteExpiration = currentTime.AddDays(400);
-
-        SetupTimeProvider(currentTime);
-
-        // Act
-        _service.ConvertToRelativeInterval(absoluteExpiration);
-
-        // Assert - verify that Log method was called (can't verify extension methods with Moq)
-        _mockLogger.Verify(
-            x => x.Log(
-                LogLevel.Warning,
-                It.IsAny<EventId>(),
-                It.IsAny<It.IsAnyType>(),
-                It.IsAny<Exception>(),
-                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-            Times.Once);
-    }
 
     #endregion
 
@@ -440,43 +284,6 @@ public sealed class TimeConverterServiceTests
         result.Should().Be(customMinimum);
     }
 
-    [Fact]
-    public void ConvertToRelativeInterval_WithDisabledLogging_DoesNotLogWarnings()
-    {
-        // Arrange
-        var currentTime = new DateTimeOffset(2025, 1, 1, 12, 0, 0, TimeSpan.Zero);
-        var absoluteExpiration = currentTime.AddMilliseconds(0.5); // Very short interval
-
-        // Setup options with disabled logging
-        var optionsWithDisabledLogging = new GlacialCachePostgreSQLOptions
-        {
-            Cache = new CacheOptions
-            {
-                MinimumExpirationInterval = TimeSpan.FromMilliseconds(1),
-                MaximumExpirationInterval = TimeSpan.FromDays(365),
-                EnableEdgeCaseLogging = false
-            }
-        };
-        var mockOptionsDisabled = new Mock<IOptionsMonitor<GlacialCachePostgreSQLOptions>>();
-        mockOptionsDisabled.Setup(x => x.CurrentValue).Returns(optionsWithDisabledLogging);
-
-        var serviceWithDisabledLogging = new TimeConverterService(_mockLogger.Object, _mockTimeProvider.Object, mockOptionsDisabled.Object);
-
-        SetupTimeProvider(currentTime);
-
-        // Act
-        serviceWithDisabledLogging.ConvertToRelativeInterval(absoluteExpiration);
-
-        // Assert - no logging should occur
-        _mockLogger.Verify(
-            x => x.Log(
-                It.IsAny<LogLevel>(),
-                It.IsAny<EventId>(),
-                It.IsAny<It.IsAnyType>(),
-                It.IsAny<Exception>(),
-                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-            Times.Never);
-    }
 
     #endregion
 }

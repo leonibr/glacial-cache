@@ -188,14 +188,32 @@ function initReleases() {
   if (!releasesContainer) return;
 
   const releasesHTML = releases
-    .map(
-      (release) => `
+    .map((release) => {
+      // Parse markdown description if marked is available, otherwise use plain text
+      let descriptionHTML = release.description;
+      if (typeof marked !== 'undefined' && marked.parse) {
+        try {
+          descriptionHTML = marked.parse(release.description, {
+            breaks: true,
+            gfm: true,
+          });
+        } catch (error) {
+          console.warn(
+            'Failed to parse markdown for release',
+            release.version,
+            error
+          );
+          // Keep original description as fallback
+        }
+      }
+
+      return `
         <div class="release-card">
             <div class="release-header">
                 <span class="release-version">${release.version}</span>
                 <span class="release-date">${formatDate(release.date)}</span>
             </div>
-            <p class="release-description">${release.description}</p>
+            <div class="release-description">${descriptionHTML}</div>
             ${
               release.highlights
                 ? `
@@ -210,8 +228,8 @@ function initReleases() {
                 : ''
             }
         </div>
-    `
-    )
+    `;
+    })
     .join('');
 
   releasesContainer.innerHTML = releasesHTML;
@@ -395,7 +413,6 @@ function initMobileMenu() {
   // For now, CSS flex-wrap handles responsive layout
 }
 
-// Optional: Fetch real GitHub releases via API
 async function fetchGitHubReleases() {
   try {
     const response = await fetch(
@@ -412,22 +429,55 @@ async function fetchGitHubReleases() {
     }));
   } catch (error) {
     console.warn('Could not fetch GitHub releases:', error);
-    return releases; // Fallback to static data
+    throw error; // Let the caller handle the error
   }
 }
 
-// Optional: Load real releases from GitHub
-// Uncomment to use live GitHub API data
-/*
+// Show error message when releases can't be loaded
+function showReleasesError() {
+  const releasesContainer = document.getElementById('releases-content');
+  if (!releasesContainer) return;
+
+  releasesContainer.innerHTML = `
+    <div class="release-error-card">
+      <div class="error-content">
+        <div class="error-icon">
+          <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <h3 class="error-title">Unable to Load Release Notes</h3>
+        <p class="error-message">
+          We couldn't load the latest release information right now. Please visit our GitHub releases page to see all updates and changes.
+        </p>
+        <a
+          href="https://github.com/leonibr/glacial-cache/releases"
+          class="btn btn-primary"
+          target="_blank"
+          rel="noopener"
+        >
+          <i class="fab fa-github me-2"></i>View All Releases on GitHub
+        </a>
+      </div>
+    </div>
+  `;
+}
+
+// Load real releases from GitHub
 (async () => {
+  try {
     const liveReleases = await fetchGitHubReleases();
     if (liveReleases.length > 0) {
-        releases.length = 0;
-        releases.push(...liveReleases);
-        initReleases();
+      releases.length = 0;
+      releases.push(...liveReleases);
+      initReleases();
     }
+  } catch (error) {
+    console.warn(
+      'Failed to load GitHub releases, showing error message:',
+      error
+    );
+    showReleasesError();
+  }
 })();
-*/
 
 // Analytics tracking (placeholder)
 function trackEvent(category, action, label) {

@@ -42,9 +42,9 @@ jobs:
                   # Minify JavaScript
                   terser main.js -o main.min.js --compress --mangle
 
-                  # Minify HTML
-                  html-minifier --collapse-whitespace --remove-comments --minify-css true --minify-js true -o index.min.html index.html
-                  html-minifier --collapse-whitespace --remove-comments --minify-css true --minify-js true -o 404.min.html 404.html
+                  # Minify HTML (keep external CSS/JS references as-is)
+                  html-minifier --collapse-whitespace --remove-comments --minify-css false --minify-js false -o index.min.html index.html
+                  html-minifier --collapse-whitespace --remove-comments --minify-css false --minify-js false -o 404.min.html 404.html
 
                   # Create dist folder
                   mkdir -p dist

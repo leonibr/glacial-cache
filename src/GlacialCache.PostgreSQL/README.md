@@ -20,7 +20,7 @@ Designed for modern, cloud-ready applications that need reliable, scalable cachi
 ✅ **Auto-cleanup**: Automatic removal of expired entries  
 ✅ **High performance**: Optimized SQL queries with proper indexing  
 ✅ **Thread-safe**: Concurrent operations supported  
-✅ **Multi-framework**: Supports .NET 6.0, 8.0, and 9.0  
+✅ **Multi-framework**: Supports .NET 8.0, 9.0, and 10.0  
 ✅ **Azure Managed Identity**: Automatic token refresh for Azure PostgreSQL  
 ✅ **Configurable serialization**: Choose between JSON and MemoryPack serializers
 
@@ -118,23 +118,23 @@ public class ProductService
 
 ## Configuration Options
 
-| Option                                   | Description                  | Default               |
-| ---------------------------------------- | ---------------------------- | --------------------- |
-| `ConnectionString`                       | PostgreSQL connection string | _Required_            |
-| `TableName`                              | Cache table name             | `glacial_cache_entries` |
-| `SchemaName`                             | Database schema              | `public`              |
-| `Maintenance.EnableAutomaticCleanup`     | Enable periodic cleanup      | `true`                |
-| `Maintenance.CleanupInterval`            | Cleanup frequency            | 30 minutes            |
-| `Maintenance.MaxCleanupBatchSize`        | Max items per cleanup batch  | 1000                  |
-| `DefaultSlidingExpiration`               | Default sliding expiration   | `null`                |
-| `DefaultAbsoluteExpirationRelativeToNow` | Default absolute expiration  | `null`                |
+| Option                                   | Description                  | Default         |
+| ---------------------------------------- | ---------------------------- | --------------- |
+| `Connection.ConnectionString`            | PostgreSQL connection string | _Required_      |
+| `TableName`                              | Cache table name             | `glacial_cache` |
+| `SchemaName`                             | Database schema              | `public`        |
+| `Maintenance.EnableAutomaticCleanup`     | Enable periodic cleanup      | `true`          |
+| `Maintenance.CleanupInterval`            | Cleanup frequency            | 30 minutes      |
+| `Maintenance.MaxCleanupBatchSize`        | Max items per cleanup batch  | 1000            |
+| `DefaultSlidingExpiration`               | Default sliding expiration   | `null`          |
+| `DefaultAbsoluteExpirationRelativeToNow` | Default absolute expiration  | `null`          |
 
 ## Database Schema
 
 GlacialCache automatically creates the following table structure:
 
 ```sql
-CREATE TABLE public.glacial_cache_entries (
+CREATE TABLE public.glacial_cache (
     key VARCHAR(900) PRIMARY KEY,
     value BYTEA NOT NULL,
     absolute_expiration TIMESTAMPTZ,
@@ -145,19 +145,19 @@ CREATE TABLE public.glacial_cache_entries (
 );
 
 -- Indexes for efficient cleanup
-CREATE INDEX idx_glacial_cache_entries_absolute_expiration
-ON public.glacial_cache_entries (absolute_expiration)
+CREATE INDEX idx_glacial_cache_absolute_expiration
+ON public.glacial_cache (absolute_expiration)
 WHERE absolute_expiration IS NOT NULL;
 
-CREATE INDEX idx_glacial_cache_entries_next_expiration
-ON public.glacial_cache_entries (next_expiration);
+CREATE INDEX idx_glacial_cache_next_expiration
+ON public.glacial_cache (next_expiration);
 
-CREATE INDEX idx_glacial_cache_entries_value_type
-ON public.glacial_cache_entries (value_type)
+CREATE INDEX idx_glacial_cache_value_type
+ON public.glacial_cache (value_type)
 WHERE value_type IS NOT NULL;
 
-CREATE INDEX idx_glacial_cache_entries_value_size
-ON public.glacial_cache_entries (value_size);
+CREATE INDEX idx_glacial_cache_value_size
+ON public.glacial_cache (value_size);
 ```
 
 ## Serialization Options
@@ -301,90 +301,131 @@ Log levels:
 - **Warning**: Non-critical errors (cleanup failures, access time updates)
 - **Error**: Critical failures (connection issues, query failures)
 
-## Azure Managed Identity Support
+## Reloadable Configuration
 
-GlacialCache supports Azure Managed Identity for secure PostgreSQL connections without storing credentials. This is especially useful for Azure-hosted applications where tokens expire every 24 hours.
+GlacialCache supports runtime configuration changes without requiring application restarts. The cache automatically reloads when configuration values change, using `IOptionsMonitor` for external configuration changes and `ObservableProperty<T>` for observable properties.
 
-### Basic Azure Managed Identity Setup
+### Supported Reloadable Properties
 
-```csharp
-// Simple configuration
-builder.Services.AddGlacialCachePostgreSQLWithAzureManagedIdentity(
-    baseConnectionString: "Host=your-server.postgres.database.azure.com;Database=yourdb;Username=your-username@your-server",
-    resourceId: "https://ossrdbms-aad.database.windows.net"
-);
-```
+- **Connection String**: Automatically recreates the database connection pool (masked in logs for security)
+- **Table Name**: Rebuilds SQL queries for cache operations
+- **Schema Name**: Rebuilds SQL queries for cache operations
+- **Connection Pool Settings**: Updates pool size limits and pruning behavior
+- **Cleanup Settings**: Adjusts maintenance intervals and batch sizes
 
-### Advanced Azure Managed Identity Configuration
+### Real-World Use Cases
 
-```csharp
-builder.Services.AddGlacialCachePostgreSQLWithAzureManagedIdentity(
-    azureOptions =>
-    {
-        azureOptions.BaseConnectionString = "Host=your-server.postgres.database.azure.com;Database=yourdb;Username=your-username@your-server";
-        azureOptions.ResourceId = "https://ossrdbms-aad.database.windows.net";
-        azureOptions.ClientId = "your-user-assigned-managed-identity-client-id"; // Optional
-        azureOptions.TokenRefreshBuffer = TimeSpan.FromHours(1); // Refresh token 1 hour before expiration
-        azureOptions.MaxRetryAttempts = 3;
-        azureOptions.RetryDelay = TimeSpan.FromSeconds(1);
-    },
-    cacheOptions =>
-    {
-        cacheOptions.TableName = "app_cache";
-        cacheOptions.SchemaName = "public";
-        cacheOptions.Maintenance.CleanupInterval = TimeSpan.FromMinutes(5);
-        cacheOptions.Maintenance.MaxCleanupBatchSize = 200;
-        cacheOptions.DefaultSlidingExpiration = TimeSpan.FromMinutes(15);
-    }
-);
-```
+#### 1. Database Failover and Disaster Recovery
 
-### Azure Managed Identity Requirements
-
-1. **Base Connection String**: Must NOT include a password/token
-2. **Azure Setup**: Enable system-assigned or user-assigned managed identity
-3. **Permissions**: Grant managed identity access to PostgreSQL server
-4. **Environment**: Must run on Azure (App Service, VM, AKS, etc.)
-5. **Network**: Access to Azure Instance Metadata Service (IMDS)
-
-### Token Refresh Behavior
-
-- **Automatic Refresh**: Tokens are refreshed 1 hour before expiration (configurable)
-- **Retry Logic**: Failed token acquisition is retried with exponential backoff
-- **Connection Pool**: Pool is recreated when tokens are refreshed
-- **Monitoring**: Token refresh events are logged at Information level
-
-### Health Check Example
+Switch to a backup database when the primary fails without downtime:
 
 ```csharp
-app.MapGet("/health/azure-cache", async (IDistributedCache cache) =>
+// Configuration that can be changed at runtime
 {
-    try
-    {
-        var testKey = $"health-check-{Guid.NewGuid()}";
-        var testValue = DateTime.UtcNow.ToString("O");
-
-        await cache.SetStringAsync(testKey, testValue, new DistributedCacheEntryOptions
-        {
-            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(1)
-        });
-
-        var retrievedValue = await cache.GetStringAsync(testKey);
-
-        if (retrievedValue == testValue)
-        {
-            await cache.RemoveAsync(testKey);
-            return Results.Ok(new { status = "healthy", message = "Azure Managed Identity cache is working" });
-        }
-
-        return Results.Problem("Cache value mismatch", statusCode: 500);
+  "GlacialCache": {
+    "Connection": {
+      "ConnectionString": "Host=primary-db.example.com;Database=cache;Username=user;Password=pass"
     }
-    catch (Exception ex)
-    {
-        return Results.Problem($"Azure Managed Identity cache health check failed: {ex.Message}", statusCode: 500);
+  }
+}
+
+// Update to backup during failover (via Azure App Configuration, environment variables, etc.)
+{
+  "GlacialCache": {
+    "Connection": {
+      "ConnectionString": "Host=backup-db.example.com;Database=cache;Username=user;Password=pass"
     }
+  }
+}
+```
+
+#### 2. Security Credential Rotation
+
+Update connection strings during password rotation policies:
+
+```csharp
+// In appsettings.json or Azure App Configuration
+{
+  "GlacialCache": {
+    "Connection": {
+      "ConnectionString": "Host=db.example.com;Database=cache;Username=user;Password=current-password"
+    }
+  }
+}
+
+// Rotate password without restart - update the configuration source
+// GlacialCache automatically reconnects with new credentials
+```
+
+#### 3. Azure App Configuration Integration
+
+Use Azure App Configuration for centralized cache management across microservices:
+
+```csharp
+// Program.cs
+builder.Configuration.AddAzureAppConfiguration(options =>
+{
+    options.Connect("Endpoint=https://my-app-config.azconfig.io;...");
+    options.ConfigureRefresh(refreshOptions =>
+    {
+        refreshOptions.Register("GlacialCache", refreshAll: true);
+    });
+});
+
+// Configuration in Azure App Configuration
+{
+  "GlacialCache": {
+    "Cache": {
+      "TableName": "shared_cache",
+      "SchemaName": "cache_schema",
+      "DefaultSlidingExpiration": "00:30:00"
+    },
+    "Maintenance": {
+      "CleanupInterval": "00:15:00",
+      "MaxCleanupBatchSize": 500
+    }
+  }
+}
+```
+
+### Security Configuration
+
+Configure connection string masking behavior:
+
+```csharp
+builder.Services.AddGlacialCachePostgreSQL(options =>
+{
+    options.Connection.ConnectionString = connectionString;
+
+    // Configure connection string masking in logs (default: enabled)
+    options.Security.ConnectionString.MaskInLogs = true; // Mask sensitive parameters
+    options.Security.ConnectionString.SensitiveParameters = new[] { "Password", "Token", "Key" };
 });
 ```
+
+### Configuration Providers
+
+Reloadable configuration works with any .NET configuration provider:
+
+- **appsettings.json**: File-based configuration
+- **Environment Variables**: Container and deployment environments
+- **Azure App Configuration**: Centralized cloud configuration
+- **Key Vault**: Secure credential management
+- **User Secrets**: Development-time secrets
+
+### Monitoring Configuration Changes
+
+Configuration changes are logged at Information level:
+
+```
+info: GlacialCache.PostgreSQL[0]
+      Connection string changed from 'Host=old-db.example.com;Username=user;Password=***' to 'Host=new-db.example.com;Username=user;Password=***'
+
+info: GlacialCache.PostgreSQL[0]
+      Configuration property 'Cache.TableName' changed from 'old_table' to 'new_table', rebuilding SQL
+```
+
+**Security Note:** Connection strings are automatically masked in logs to prevent exposure of sensitive information like passwords and tokens.
 
 ## Testing
 
@@ -417,6 +458,3 @@ MIT License - see the [LICENSE](LICENSE) file for details.
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
-
-
-

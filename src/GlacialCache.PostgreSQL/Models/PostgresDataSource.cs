@@ -84,11 +84,67 @@ internal sealed class PostgreSQLDataSource : IPostgreSQLDataSource
         }
     }
 
+    private string MaskConnectionString(string connectionString, Configuration.Security.ConnectionStringOptions securityOptions)
+    {
+        if (!securityOptions.MaskInLogs)
+        {
+            return connectionString;
+        }
+
+        try
+        {
+            // Parse connection string manually to handle custom parameters
+            var parts = connectionString.Split(';');
+            var maskedParts = new List<string>();
+
+            foreach (var part in parts)
+            {
+                if (string.IsNullOrWhiteSpace(part))
+                    continue;
+
+                var keyValue = part.Split('=', 2);
+                if (keyValue.Length == 2)
+                {
+                    var key = keyValue[0].Trim();
+                    var value = keyValue[1].Trim();
+
+                    // Check if this parameter should be masked (case-insensitive)
+                    var shouldMask = securityOptions.SensitiveParameters.Any(
+                        sensitive => string.Equals(sensitive, key, StringComparison.OrdinalIgnoreCase));
+
+                    if (shouldMask)
+                    {
+                        maskedParts.Add($"{key}=***");
+                    }
+                    else
+                    {
+                        maskedParts.Add(part);
+                    }
+                }
+                else
+                {
+                    // If not a key=value pair, keep as is
+                    maskedParts.Add(part);
+                }
+            }
+
+            return string.Join(';', maskedParts);
+        }
+        catch (Exception)
+        {
+            // If parsing fails, return original string to avoid breaking functionality
+            return connectionString;
+        }
+    }
+
     private void OnConnectionStringChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e is PropertyChangedEventArgs<string> typedArgs)
         {
-            _logger.LogDebug("Connection string changed from {OldValue} to {NewValue}", typedArgs.OldValue, typedArgs.NewValue);
+            var maskedOldValue = MaskConnectionString(typedArgs.OldValue, _options.Security.ConnectionString);
+            var maskedNewValue = MaskConnectionString(typedArgs.NewValue, _options.Security.ConnectionString);
+
+            _logger.LogDebug("Connection string changed from {OldValue} to {NewValue}", maskedOldValue, maskedNewValue);
             ReloadFromConnectionString(typedArgs.NewValue);
         }
     }

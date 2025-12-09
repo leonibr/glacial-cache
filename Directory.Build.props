@@ -2,8 +2,20 @@
     <PropertyGroup>
         <!-- Enable NuGet package lock files -->
         <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
-        <!-- Lock file location: at solution root -->
         <NuGetLockFilePath>$(MSBuildThisFileDirectory)packages.lock.json</NuGetLockFilePath>
+
+
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <LangVersion>latest</LangVersion>
+        <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+
+
+        <Authors>Ashley Marques</Authors>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <RepositoryUrl>https://github.com/leonibr/glacial-cache</RepositoryUrl>
+        <PackageProjectUrl>https://github.com/leonibr/glacial-cache</PackageProjectUrl>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
 </Project>
 

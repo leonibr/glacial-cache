@@ -13,7 +13,7 @@ using Logging;
 /// <summary>
 /// Simple background service for periodic cleanup of expired cache entries.
 /// </summary>
-internal class CleanupBackgroundService : BackgroundService
+internal class CleanupBackgroundService : BackgroundService, ICleanupBackgroundService
 {
     private readonly GlacialCachePostgreSQLOptions _options;
     private readonly ILogger<CleanupBackgroundService> _logger;

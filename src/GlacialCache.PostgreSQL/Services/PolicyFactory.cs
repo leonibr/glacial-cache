@@ -3,6 +3,7 @@ using Npgsql;
 using Polly;
 using Polly.Timeout;
 using GlacialCache.PostgreSQL.Abstractions;
+using GlacialCache.PostgreSQL.Configuration.Resilience;
 
 namespace GlacialCache.PostgreSQL.Services;
 using Configuration;
@@ -33,7 +34,7 @@ public class PolicyFactory : IPolicyFactory
             .Or<InvalidOperationException>(ex => IsTransientInvalidOperationException(ex)) // Connection state issues
             .WaitAndRetryAsync(
                 options.Resilience.Retry.MaxAttempts,
-                retryAttempt => CalculateBackoff(retryAttempt, options.Resilience.Retry.BaseDelay),
+                retryAttempt => CalculateBackoff(retryAttempt, options.Resilience.Retry.BaseDelay, options.Resilience.Retry.BackoffStrategy),
                 onRetry: (exception, timeSpan, retryCount, context) =>
                 {
                     if (options.Resilience.Logging.EnableResilienceLogging)
@@ -126,13 +127,34 @@ public class PolicyFactory : IPolicyFactory
     }
 
     /// <summary>
-    /// Calculates exponential backoff with jitter for retry attempts.
+    /// Calculates backoff delay for retry attempts based on the configured strategy.
     /// </summary>
-    private static TimeSpan CalculateBackoff(int retryAttempt, TimeSpan baseDelay)
+    private static TimeSpan CalculateBackoff(int retryAttempt, TimeSpan baseDelay, BackoffStrategy strategy)
     {
-        var exponentialDelay = baseDelay * Math.Pow(2, retryAttempt - 1);
-        var jitter = Random.Shared.NextDouble() * 0.1; // 10% jitter
-        return TimeSpan.FromMilliseconds(exponentialDelay.TotalMilliseconds * (1 + jitter));
+        double delayMultiplier;
+
+        switch (strategy)
+        {
+            case BackoffStrategy.Linear:
+                // Linear: baseDelay, baseDelay * 2, baseDelay * 3, etc.
+                delayMultiplier = retryAttempt;
+                break;
+
+            case BackoffStrategy.Exponential:
+                // Exponential: baseDelay, baseDelay * 2, baseDelay * 4, etc.
+                delayMultiplier = Math.Pow(2, retryAttempt - 1);
+                break;
+
+            case BackoffStrategy.ExponentialWithJitter:
+            default:
+                // Exponential with jitter: exponential backoff with randomization
+                delayMultiplier = Math.Pow(2, retryAttempt - 1);
+                var jitter = Random.Shared.NextDouble() * 0.1; // 10% jitter
+                delayMultiplier *= (1 + jitter);
+                break;
+        }
+
+        return TimeSpan.FromMilliseconds(baseDelay.TotalMilliseconds * delayMultiplier);
     }
 
     /// <summary>

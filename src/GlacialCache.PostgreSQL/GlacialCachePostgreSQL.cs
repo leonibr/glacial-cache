@@ -1144,7 +1144,7 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
             }
             catch (Exception ex) when (IsConnectionFailure(ex))
             {
-                _logger.LogResilienceConnectionFailure(operationName, key, ex);
+                ResilienceOperations.LogResilienceConnectionFailureWithLevel(_logger, _options.Resilience.Logging.ConnectionFailureLogLevel, operationName, key, ex);
                 return default;
             }
         }
@@ -1164,7 +1164,7 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
             }
             catch (Exception ex) when (IsConnectionFailure(ex))
             {
-                _logger.LogResilienceConnectionFailure(operationName, key, ex);
+                ResilienceOperations.LogResilienceConnectionFailureWithLevel(_logger, _options.Resilience.Logging.ConnectionFailureLogLevel, operationName, key, ex);
             }
         }
         else

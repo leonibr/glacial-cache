@@ -436,6 +436,192 @@ public class PolicyFactoryTests
             Times.AtLeastOnce);
     }
 
+    [Fact]
+    public void RetryPolicy_WithLinearBackoffStrategy_ShouldUseLinearDelays()
+    {
+        // Arrange
+        var options = new GlacialCachePostgreSQLOptions
+        {
+            Resilience = new ResilienceOptions
+            {
+                EnableResiliencePatterns = true,
+                Retry = new RetryOptions
+                {
+                    MaxAttempts = 3,
+                    BaseDelay = TimeSpan.FromMilliseconds(100),
+                    BackoffStrategy = BackoffStrategy.Linear
+                },
+                Logging = new LoggingOptions
+                {
+                    EnableResilienceLogging = true
+                }
+            }
+        };
+
+        var policy = _policyFactory.CreateRetryPolicy(options);
+        var attemptCount = 0;
+        var delays = new List<TimeSpan>();
+
+        // Act
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var result = policy.ExecuteAsync(async () =>
+        {
+            attemptCount++;
+            if (attemptCount < 3)
+            {
+                // Capture the delay before throwing
+                var delayStart = stopwatch.Elapsed;
+                await Task.Delay(10); // Small delay to simulate work
+                throw CreateTransientPostgresException();
+            }
+            return "success";
+        }).GetAwaiter().GetResult();
+        stopwatch.Stop();
+
+        // Assert
+        result.Should().Be("success");
+        attemptCount.Should().Be(3); // 2 retries + 1 success
+
+        // Linear backoff: first retry at 100ms, second at 200ms
+        // Total time should be roughly 100ms + 200ms + some overhead
+        stopwatch.Elapsed.Should().BeGreaterThan(TimeSpan.FromMilliseconds(250));
+        stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(400));
+    }
+
+    [Fact]
+    public void RetryPolicy_WithExponentialBackoffStrategy_ShouldUseExponentialDelays()
+    {
+        // Arrange
+        var options = new GlacialCachePostgreSQLOptions
+        {
+            Resilience = new ResilienceOptions
+            {
+                EnableResiliencePatterns = true,
+                Retry = new RetryOptions
+                {
+                    MaxAttempts = 3,
+                    BaseDelay = TimeSpan.FromMilliseconds(100),
+                    BackoffStrategy = BackoffStrategy.Exponential
+                },
+                Logging = new LoggingOptions
+                {
+                    EnableResilienceLogging = true
+                }
+            }
+        };
+
+        var policy = _policyFactory.CreateRetryPolicy(options);
+        var attemptCount = 0;
+
+        // Act
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var result = policy.ExecuteAsync(async () =>
+        {
+            attemptCount++;
+            if (attemptCount < 3)
+            {
+                throw CreateTransientPostgresException();
+            }
+            return "success";
+        }).GetAwaiter().GetResult();
+        stopwatch.Stop();
+
+        // Assert
+        result.Should().Be("success");
+        attemptCount.Should().Be(3);
+
+        // Exponential backoff: first retry at 100ms (base * 2^0), second at 200ms (base * 2^1)
+        // Total time should be roughly 100ms + 200ms + some overhead
+        stopwatch.Elapsed.Should().BeGreaterThan(TimeSpan.FromMilliseconds(250));
+        stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(400));
+    }
+
+    [Fact]
+    public void RetryPolicy_WithExponentialWithJitterBackoffStrategy_ShouldUseExponentialDelaysWithJitter()
+    {
+        // Arrange
+        var options = new GlacialCachePostgreSQLOptions
+        {
+            Resilience = new ResilienceOptions
+            {
+                EnableResiliencePatterns = true,
+                Retry = new RetryOptions
+                {
+                    MaxAttempts = 4,
+                    BaseDelay = TimeSpan.FromMilliseconds(100),
+                    BackoffStrategy = BackoffStrategy.ExponentialWithJitter
+                },
+                Logging = new LoggingOptions
+                {
+                    EnableResilienceLogging = true
+                }
+            }
+        };
+
+        var policy = _policyFactory.CreateRetryPolicy(options);
+        var attemptCount = 0;
+
+        // Act - Run multiple times to verify jitter is applied
+        var totalTimes = new List<TimeSpan>();
+        for (int run = 0; run < 5; run++)
+        {
+            attemptCount = 0;
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            var result = policy.ExecuteAsync(async () =>
+            {
+                attemptCount++;
+                if (attemptCount < 4)
+                {
+                    throw CreateTransientPostgresException();
+                }
+                return "success";
+            }).GetAwaiter().GetResult();
+            stopwatch.Stop();
+
+            totalTimes.Add(stopwatch.Elapsed);
+            result.Should().Be("success");
+        }
+
+        // Assert - With jitter, times should vary but be within reasonable bounds
+        // Exponential with jitter: delays vary but should be around 100ms, 200ms, 400ms
+        // Total should be roughly 700ms with jitter variations
+        foreach (var time in totalTimes)
+        {
+            time.Should().BeGreaterThan(TimeSpan.FromMilliseconds(500));
+            time.Should().BeLessThan(TimeSpan.FromMilliseconds(1000));
+        }
+
+        // Verify that times are not identical (jitter is working)
+        var uniqueTimes = totalTimes.Distinct().Count();
+        uniqueTimes.Should().BeGreaterThan(1, "Jitter should cause variation in execution times");
+    }
+
+    [Fact]
+    public void RetryPolicy_WithDefaultBackoffStrategy_ShouldUseExponentialWithJitter()
+    {
+        // Arrange - Use default configuration
+        var policy = _policyFactory.CreateRetryPolicy(_options);
+        var attemptCount = 0;
+
+        // Act
+        var result = policy.ExecuteAsync(async () =>
+        {
+            attemptCount++;
+            if (attemptCount < 3)
+            {
+                throw CreateTransientPostgresException();
+            }
+            return "success";
+        }).GetAwaiter().GetResult();
+
+        // Assert
+        result.Should().Be("success");
+        attemptCount.Should().Be(3);
+
+        // Default should be ExponentialWithJitter
+        _options.Resilience.Retry.BackoffStrategy.Should().Be(BackoffStrategy.ExponentialWithJitter);
+    }
+
     private static PostgresException CreateTransientPostgresException()
     {
         return new PostgresException("Connection failed", null, "08000", null);

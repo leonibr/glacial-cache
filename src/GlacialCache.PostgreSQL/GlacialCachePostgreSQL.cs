@@ -1186,7 +1186,8 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
                 npgsqlEx.InnerException is System.IO.IOException ||
                 npgsqlEx.InnerException is System.Net.Sockets.SocketException) ||
                ex is TimeoutException ||
-               ex is Polly.Timeout.TimeoutRejectedException ||
+               // Note: TimeoutRejectedException is NOT a connection failure - it's an operation timeout
+               // and should be propagated to the caller, not silently handled
                ex is Polly.CircuitBreaker.BrokenCircuitException ||
                ex is System.Net.Sockets.SocketException ||
                ex is System.IO.IOException && ex.Message.Contains("transport connection") ||

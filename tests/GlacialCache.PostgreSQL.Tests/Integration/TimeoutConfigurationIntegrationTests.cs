@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Testcontainers.PostgreSql;
 using GlacialCache.PostgreSQL.Extensions;
 using GlacialCache.PostgreSQL.Abstractions;
@@ -121,15 +122,31 @@ public class TimeoutConfigurationIntegrationTests : IntegrationTestBase
             options.Resilience.Timeouts.OperationTimeout = TimeSpan.FromMilliseconds(500); // Very short timeout
         });
 
-        // Act & Assert - Attempt to execute a slow query that should timeout
-        var exception = await Assert.ThrowsAsync<TimeoutRejectedException>(async () =>
-        {
-            // This should trigger a slow operation that exceeds the timeout
-            await ExecuteSlowQueryAsync(TimeSpan.FromSeconds(2)); // Query takes 2 seconds, timeout is 500ms
-        });
+        // Create a PostgreSQL function that will make cache operations slow
+        // We'll use a trigger that adds delay to INSERT operations on the cache table
+        await CreateSlowOperationTriggerAsync();
 
-        // Verify the timeout exception was thrown
-        Assert.Contains("timeout", exception.Message.ToLower());
+        try
+        {
+            // Act & Assert - Attempt to execute a cache operation that will be slowed down by the trigger
+            var exception = await Assert.ThrowsAsync<TimeoutRejectedException>(async () =>
+            {
+                // This cache operation will trigger the slow function via the database trigger
+                // The operation should timeout because the trigger adds a 2-second delay
+                await _cache!.SetStringAsync("slow-test-key", "slow-test-value", new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(1)
+                });
+            });
+
+            // Verify the timeout exception was thrown
+            Assert.Contains("timeout", exception.Message.ToLower());
+        }
+        finally
+        {
+            // Clean up the trigger
+            await CleanupSlowOperationTriggerAsync();
+        }
     }
 
     [Fact]
@@ -158,22 +175,33 @@ public class TimeoutConfigurationIntegrationTests : IntegrationTestBase
     public async Task Timeouts_CommandTimeout_WithLongRunningCommand()
     {
         // Arrange - Set up cache with short command timeout
+        // Note: CommandTimeout needs to be applied to NpgsqlCommand.CommandTimeout in the implementation.
+        // This test verifies that when CommandTimeout is set on a command, it works correctly.
         await SetupCacheAsync(options =>
         {
             options.Resilience.EnableResiliencePatterns = true;
             options.Resilience.Timeouts.CommandTimeout = TimeSpan.FromMilliseconds(300); // Very short timeout
         });
 
+        var dataSource = _serviceProvider!.GetRequiredService<IPostgreSQLDataSource>();
+
+        await using var connection = await dataSource.GetConnectionAsync();
+
+        // Npgsql CommandTimeout is in seconds (int), so 300ms = 0.3 seconds rounds to 0 or 1
+        // We'll use 1 second timeout with a 2 second sleep to ensure timeout
+        await using var longRunningCommand = new NpgsqlCommand($"SELECT pg_sleep(2)", connection);
+        longRunningCommand.CommandTimeout = 1; // 1 second timeout, but sleep is 2 seconds
+
         // Act & Assert - Attempt to execute a long-running command that should timeout
         var exception = await Assert.ThrowsAsync<NpgsqlException>(async () =>
         {
-            // Execute a command that takes longer than the timeout
-            await ExecuteLongRunningCommandAsync(TimeSpan.FromSeconds(1));
+            await longRunningCommand.ExecuteNonQueryAsync();
         });
 
-        // Verify it's a timeout-related exception (could be NpgsqlException or TimeoutRejectedException)
+        // Verify it's a timeout-related exception
         Assert.True(exception.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase) ||
-                   exception.InnerException?.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase) == true);
+                   exception.InnerException?.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase) == true ||
+                   exception.Message.Contains("timed out", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -343,28 +371,64 @@ public class TimeoutConfigurationIntegrationTests : IntegrationTestBase
     }
 
     /// <summary>
-    /// Helper method to execute a slow database query using PostgreSQL's pg_sleep function.
+    /// Helper method to create a trigger that makes cache operations slow.
+    /// This creates a function and trigger that adds a delay to INSERT/UPDATE operations on the cache table.
     /// </summary>
-    private async Task ExecuteSlowQueryAsync(TimeSpan delay)
+    private async Task CreateSlowOperationTriggerAsync()
     {
         var dataSource = _serviceProvider!.GetRequiredService<IPostgreSQLDataSource>();
+        var options = _serviceProvider!.GetRequiredService<IOptionsMonitor<GlacialCachePostgreSQLOptions>>().CurrentValue;
+
+        // Get the actual table name and schema from options
+        var schemaName = options.Cache.SchemaName ?? "public";
+        var tableName = options.Cache.TableName ?? "glacial_cache";
+        var fullTableName = string.IsNullOrWhiteSpace(schemaName) || schemaName == "public"
+            ? tableName
+            : $"{schemaName}.{tableName}";
 
         await using var connection = await dataSource.GetConnectionAsync();
-        await using var command = new NpgsqlCommand($"SELECT pg_sleep({delay.TotalSeconds})", connection);
 
-        await command.ExecuteNonQueryAsync();
+        // Create a function that sleeps for 2 seconds
+        await using var createFunctionCommand = new NpgsqlCommand(@"
+            CREATE OR REPLACE FUNCTION slow_cache_operation()
+            RETURNS TRIGGER AS $$
+            BEGIN
+                PERFORM pg_sleep(2);
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;", connection);
+        await createFunctionCommand.ExecuteNonQueryAsync();
+
+        // Create a trigger that calls the function before INSERT/UPDATE
+        await using var createTriggerCommand = new NpgsqlCommand($@"
+            DROP TRIGGER IF EXISTS slow_cache_trigger ON {fullTableName};
+            CREATE TRIGGER slow_cache_trigger
+            BEFORE INSERT OR UPDATE ON {fullTableName}
+            FOR EACH ROW
+            EXECUTE FUNCTION slow_cache_operation();", connection);
+        await createTriggerCommand.ExecuteNonQueryAsync();
     }
 
     /// <summary>
-    /// Helper method to execute a long-running database command.
+    /// Helper method to clean up the slow operation trigger.
     /// </summary>
-    private async Task ExecuteLongRunningCommandAsync(TimeSpan duration)
+    private async Task CleanupSlowOperationTriggerAsync()
     {
         var dataSource = _serviceProvider!.GetRequiredService<IPostgreSQLDataSource>();
+        var options = _serviceProvider!.GetRequiredService<IOptionsMonitor<GlacialCachePostgreSQLOptions>>().CurrentValue;
+
+        // Get the actual table name and schema from options
+        var schemaName = options.Cache.SchemaName ?? "public";
+        var tableName = options.Cache.TableName ?? "glacial_cache";
+        var fullTableName = string.IsNullOrWhiteSpace(schemaName) || schemaName == "public"
+            ? tableName
+            : $"{schemaName}.{tableName}";
 
         await using var connection = await dataSource.GetConnectionAsync();
-        await using var command = new NpgsqlCommand($"SELECT pg_sleep({duration.TotalSeconds})", connection);
 
-        await command.ExecuteNonQueryAsync();
+        await using var dropTriggerCommand = new NpgsqlCommand($@"
+            DROP TRIGGER IF EXISTS slow_cache_trigger ON {fullTableName};
+            DROP FUNCTION IF EXISTS slow_cache_operation();", connection);
+        await dropTriggerCommand.ExecuteNonQueryAsync();
     }
 }

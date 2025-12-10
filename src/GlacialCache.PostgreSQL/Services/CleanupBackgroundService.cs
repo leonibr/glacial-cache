@@ -71,6 +71,10 @@ internal class CleanupBackgroundService : BackgroundService, ICleanupBackgroundS
 
     private async Task ExecuteCleanupAsync(CancellationToken token)
     {
+        // Early return if cancellation requested
+        if (token.IsCancellationRequested)
+            return;
+
         try
         {
             await using var connection = await _dataSource.GetConnectionAsync(token);
@@ -85,10 +89,28 @@ internal class CleanupBackgroundService : BackgroundService, ICleanupBackgroundS
                 _logger.LogCleanupCompleted(deletedCount);
             }
         }
+        catch (OperationCanceledException)
+        {
+            // Expected during shutdown - log at debug level
+            _logger.LogDebug("Cleanup operation cancelled during shutdown");
+        }
+        catch (Exception ex) when (IsShutdownException(ex))
+        {
+            // Expected shutdown scenario - log at debug level
+            _logger.LogDebug(ex, "Cleanup operation interrupted during shutdown");
+        }
         catch (Exception ex)
         {
+            // Actual error - log at error level
             _logger.LogCleanupError(ex);
         }
+    }
+
+    private static bool IsShutdownException(Exception ex)
+    {
+        return ex is ObjectDisposedException ||
+               (ex is NpgsqlException npgsqlEx &&
+                npgsqlEx.InnerException is System.IO.EndOfStreamException);
     }
 
     public override void Dispose()

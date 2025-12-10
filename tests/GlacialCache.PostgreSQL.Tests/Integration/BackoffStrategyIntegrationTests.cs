@@ -90,6 +90,10 @@ public class BackoffStrategyIntegrationTests : IntegrationTestBase
         var services = new ServiceCollection();
         var mockLogger = new Mock<ILogger>();
 
+        // Set up logger to return true for IsEnabled for all log levels
+        // This ensures Debug-level retry logs are not skipped
+        mockLogger.Setup(x => x.IsEnabled(It.IsAny<LogLevel>())).Returns(true);
+
         // Register the mock logger factory that returns our mock logger for all types
         services.AddSingleton<ILoggerFactory>(sp => new MockLoggerFactory(mockLogger));
 

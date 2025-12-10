@@ -11,7 +11,6 @@ using GlacialCache.PostgreSQL.Services;
 using Xunit.Abstractions;
 using Npgsql;
 using Moq;
-using FluentAssertions.Execution;
 
 namespace GlacialCache.PostgreSQL.Tests.Integration;
 

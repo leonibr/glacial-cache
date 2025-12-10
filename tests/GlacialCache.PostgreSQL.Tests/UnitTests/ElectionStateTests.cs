@@ -54,13 +54,13 @@ public class ElectionStateTests
         var (electionState, loggerMock) = CreateElectionStateWithLogger("test-instance-123");
 
 
-        electionState.InstanceId.Should().Be("test-instance-123",
+        electionState.InstanceId.ShouldBe("test-instance-123",
             "Instance ID should be set to the provided value");
-        electionState.IsManager.Should().BeFalse(
+        electionState.IsManager.ShouldBeFalse(
             "New instances should not be managers by default");
-        electionState.ElectedAt.Should().BeNull(
+        electionState.ElectedAt.ShouldBeNull(
             "Election time should be null for new instances");
-        electionState.LostAt.Should().BeNull(
+        electionState.LostAt.ShouldBeNull(
             "Loss time should be null for new instances");
 
 
@@ -87,11 +87,11 @@ public class ElectionStateTests
         await electionState.BecomeManagerAsync();
 
         // Assert: Verify state changes are applied correctly
-        electionState.IsManager.Should().BeTrue(
+        electionState.IsManager.ShouldBeTrue(
             "Instance should be marked as manager after successful transition");
-        electionState.ElectedAt.Should().NotBeNull(
+        electionState.ElectedAt.ShouldNotBeNull(
             "Election timestamp should be recorded when becoming manager");
-        electionState.LostAt.Should().BeNull(
+        electionState.LostAt.ShouldBeNull(
             "Loss timestamp should remain null when currently manager");
 
         // Verify audit trail - ensures state changes are logged for debugging/monitoring
@@ -116,7 +116,7 @@ public class ElectionStateTests
 
         Func<Task> act = () => electionState.BecomeManagerAsync();
 
-        await act.Should().ThrowAsync<ObjectDisposedException>(
+        await act.ShouldThrowAsync<ObjectDisposedException>(
             "BecomeManagerAsync should throw ObjectDisposedException when disposed");
     }
 
@@ -136,11 +136,11 @@ public class ElectionStateTests
         // Act: Lose manager status
         await electionState.LoseManagerAsync();
 
-        electionState.IsManager.Should().BeFalse(
+        electionState.IsManager.ShouldBeFalse(
             "Instance should no longer be manager after losing leadership");
-        electionState.LostAt.Should().NotBeNull(
+        electionState.LostAt.ShouldNotBeNull(
             "Loss timestamp should be recorded when leadership is lost");
-        electionState.ElectedAt.Should().Be(originalElectedAt,
+        electionState.ElectedAt.ShouldBe(originalElectedAt,
             "Original election time should be preserved for historical tracking");
 
         loggerMock.Verify(
@@ -167,9 +167,9 @@ public class ElectionStateTests
         var (isManager, electedAt, lostAt) = await electionState.GetStateSnapshotAsync();
 
         // Assert
-        isManager.Should().BeTrue();
-        electedAt.Should().Be(expectedElectedAt);
-        lostAt.Should().BeNull();
+        isManager.ShouldBeTrue();
+        electedAt.ShouldBe(expectedElectedAt);
+        lostAt.ShouldBeNull();
     }
 
     [Fact]
@@ -237,8 +237,8 @@ public class ElectionStateTests
         await electionState.BecomeManagerAsync();
 
         // Assert
-        electionState.IsManager.Should().BeTrue();
-        electionState.ElectedAt.Should().Be(firstElectedAt); // Should not change
+        electionState.IsManager.ShouldBeTrue();
+        electionState.ElectedAt.ShouldBe(firstElectedAt); // Should not change
 
         // Verify NO additional logging occurred (idempotent operation)
         // The Reset() call above clears previous calls, so we should see no new calls
@@ -268,8 +268,8 @@ public class ElectionStateTests
         await electionState.LoseManagerAsync();
 
         // Assert
-        electionState.IsManager.Should().BeFalse();
-        electionState.LostAt.Should().BeNull(); // Should remain null
+        electionState.IsManager.ShouldBeFalse();
+        electionState.LostAt.ShouldBeNull(); // Should remain null
 
         // Verify NO logging occurred (no-op operation)
         loggerMock.Verify(
@@ -299,8 +299,8 @@ public class ElectionStateTests
         });
 
         // Assert
-        actionExecuted.Should().BeTrue();
-        electionState.IsManager.Should().BeTrue();
+        actionExecuted.ShouldBeTrue();
+        electionState.IsManager.ShouldBeTrue();
 
         // Verify logging occurred for the state change
         loggerMock.Verify(
@@ -326,7 +326,8 @@ public class ElectionStateTests
 
         // Assert - Should not throw when Dispose is called multiple times
         // This is mainly to ensure Dispose can be called safely multiple times
-        electionState.Invoking(x => x.Dispose()).Should().NotThrow();
+        Action act = () => electionState.Dispose();
+        act.ShouldNotThrow();
 
         // Verify disposal was logged
         loggerMock.Verify(
@@ -353,8 +354,8 @@ public class ElectionStateTests
         // Act & Assert: Constructor should reject null instanceId
         Action act = () => new ElectionState(logger.Object, timeProvider, null!);
 
-        act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("instanceId");
+        act.ShouldThrow<ArgumentNullException>()
+            .Message.ShouldContain("instanceId");
     }
 
 
@@ -367,8 +368,8 @@ public class ElectionStateTests
         // Act & Assert: Constructor should reject null logger
         Action act = () => new ElectionState(null, timeProvider, "test-id");
 
-        act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("logger");
+        act.ShouldThrow<ArgumentNullException>()
+            .Message.ShouldContain("logger");
     }
 
     [Fact]
@@ -380,8 +381,8 @@ public class ElectionStateTests
         // Act & Assert: Constructor should reject null time provider
         Action act = () => new ElectionState(logger.Object, null, "test-id");
 
-        act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("timeProvider");
+        act.ShouldThrow<ArgumentNullException>()
+            .Message.ShouldContain("timeProvider");
     }
 
 
@@ -393,7 +394,7 @@ public class ElectionStateTests
 
         Func<Task> act = () => electionState.BecomeManagerAsync();
 
-        await act.Should().ThrowAsync<ObjectDisposedException>();
+        await act.ShouldThrowAsync<ObjectDisposedException>();
     }
 
     [Fact]
@@ -404,7 +405,7 @@ public class ElectionStateTests
 
         Func<Task> act = () => electionState.LoseManagerAsync();
 
-        await act.Should().ThrowAsync<ObjectDisposedException>();
+        await act.ShouldThrowAsync<ObjectDisposedException>();
     }
 
     [Fact]
@@ -415,7 +416,7 @@ public class ElectionStateTests
 
         Func<Task> act = () => electionState.GetStateSnapshotAsync();
 
-        await act.Should().ThrowAsync<ObjectDisposedException>();
+        await act.ShouldThrowAsync<ObjectDisposedException>();
     }
 
     [Fact]
@@ -426,7 +427,7 @@ public class ElectionStateTests
 
         Func<Task> act = () => electionState.UpdateStateAsync(updater => updater.BecomeManager());
 
-        await act.Should().ThrowAsync<ObjectDisposedException>();
+        await act.ShouldThrowAsync<ObjectDisposedException>();
     }
 
 
@@ -463,7 +464,7 @@ public class ElectionStateTests
 
         Func<Task> act = () => electionState.BecomeManagerAsync(cts.Token);
 
-        await act.Should().ThrowAsync<OperationCanceledException>();
+        await act.ShouldThrowAsync<OperationCanceledException>();
     }
 
     [Fact]
@@ -479,7 +480,7 @@ public class ElectionStateTests
 
         Func<Task> act = () => electionState.LoseManagerAsync(cts.Token);
 
-        await act.Should().ThrowAsync<OperationCanceledException>();
+        await act.ShouldThrowAsync<OperationCanceledException>();
     }
 
     [Fact]
@@ -492,7 +493,7 @@ public class ElectionStateTests
 
         Func<Task> act = () => electionState.GetStateSnapshotAsync(cts.Token);
 
-        await act.Should().ThrowAsync<OperationCanceledException>();
+        await act.ShouldThrowAsync<OperationCanceledException>();
     }
 
     [Fact]
@@ -509,7 +510,7 @@ public class ElectionStateTests
             cts.Token
         );
 
-        await act.Should().ThrowAsync<OperationCanceledException>();
+        await act.ShouldThrowAsync<OperationCanceledException>();
     }
 
 
@@ -554,7 +555,7 @@ public class ElectionStateTests
         await Task.WhenAll(tasks);
 
         // Assert - Verify semaphore prevented concurrent access
-        maxConcurrentAccess.Should().Be(1, "Semaphore should prevent concurrent critical section access");
+        maxConcurrentAccess.ShouldBe(1, "Semaphore should prevent concurrent critical section access");
     }
 
     [Fact]
@@ -586,8 +587,8 @@ public class ElectionStateTests
         await Task.WhenAll(tasks);
 
         // Assert - Verify all operations maintained consistency
-        successfulTransitions.Should().BeGreaterThan(0);
-        electionState.IsManager.Should().BeTrue(); // Final state should be consistent
+        successfulTransitions.ShouldBeGreaterThan(0);
+        electionState.IsManager.ShouldBeTrue(); // Final state should be consistent
     }
 
     [Fact]
@@ -621,7 +622,7 @@ public class ElectionStateTests
         await Task.WhenAll(tasks);
 
         // Assert - Verify no impossible state transitions occurred
-        inconsistencies.Should().Be(0, "No impossible state transitions should occur");
+        inconsistencies.ShouldBe(0, "No impossible state transitions should occur");
     }
 
     [Fact]
@@ -685,7 +686,7 @@ public class ElectionStateTests
         await Task.WhenAll(tasks);
 
         // Assert - Verify cancellation was handled properly
-        cancelledTasks.Should().BeGreaterThan(0);
+        cancelledTasks.ShouldBeGreaterThan(0);
     }
 
     [Fact]
@@ -765,7 +766,7 @@ public class ElectionStateTests
         // Assert - Verify dispose handled concurrent operations gracefully
         // Allow ObjectDisposedException but not other exceptions
         var unexpectedExceptions = exceptions.Where(ex => !(ex is ObjectDisposedException)).ToList();
-        unexpectedExceptions.Should().BeEmpty();
+        unexpectedExceptions.ShouldBeEmpty();
     }
 
     #endregion
@@ -789,9 +790,9 @@ public class ElectionStateTests
         var (electionState, loggerMock) = CreateElectionStateWithLogger("election-instance-01");
 
         // Behavioral verification: Initially not a manager
-        electionState.IsManager.Should().BeFalse("New instances should start as non-managers");
-        electionState.ElectedAt.Should().BeNull("No election time initially");
-        electionState.LostAt.Should().BeNull("No loss time initially");
+        electionState.IsManager.ShouldBeFalse("New instances should start as non-managers");
+        electionState.ElectedAt.ShouldBeNull("No election time initially");
+        electionState.LostAt.ShouldBeNull("No loss time initially");
 
         // Act & Assert: Gain leadership
         var beforeElection = _time.Now();
@@ -799,10 +800,10 @@ public class ElectionStateTests
         var afterElection = _time.Now();
 
         // Behavioral verification: Leadership acquisition
-        electionState.IsManager.Should().BeTrue("Instance should become manager");
-        electionState.ElectedAt.Should().BeOnOrAfter(beforeElection, "Election time should be recorded");
-        electionState.ElectedAt.Should().BeOnOrBefore(afterElection, "Election time should be accurate");
-        electionState.LostAt.Should().BeNull("Loss time should remain null while manager");
+        electionState.IsManager.ShouldBeTrue("Instance should become manager");
+        electionState.ElectedAt!.Value.ShouldBeGreaterThanOrEqualTo(beforeElection, "Election time should be recorded");
+        electionState.ElectedAt!.Value.ShouldBeLessThanOrEqualTo(afterElection, "Election time should be accurate");
+        electionState.LostAt.ShouldBeNull("Loss time should remain null while manager");
 
         // Behavioral verification: Logging captures leadership acquisition
         loggerMock.Verify(
@@ -827,14 +828,16 @@ public class ElectionStateTests
         await electionState.LoseManagerAsync();
         var afterLoss = _time.Now();
 
+        var lostAt = electionState.LostAt;
+        lostAt.ShouldNotBeNull("Loss time should be recorded");
         // Behavioral verification: Leadership loss
-        electionState.IsManager.Should().BeFalse("Instance should no longer be manager");
-        electionState.LostAt.Should().BeOnOrAfter(beforeLoss, "Loss time should be recorded");
-        electionState.LostAt.Should().BeOnOrBefore(afterLoss, "Loss time should be accurate");
-        electionState.ElectedAt.Should().NotBeNull("Election time should be preserved");
+        electionState.IsManager.ShouldBeFalse("Instance should no longer be manager");
+        lostAt.Value.ShouldBeGreaterThanOrEqualTo(beforeLoss, "Loss time should be recorded");
+        lostAt.Value.ShouldBeLessThanOrEqualTo(afterLoss, "Loss time should be accurate");
+        electionState.ElectedAt.ShouldNotBeNull("Election time should be preserved");
 
         // Behavioral verification: Loss time should be after election time
-        electionState.LostAt.Should().BeAfter(electionState.ElectedAt.Value,
+        lostAt.Value.ShouldBeGreaterThan(electionState.ElectedAt.Value,
             "Loss time should occur after election time");
 
         // Behavioral verification: Logging captures leadership loss
@@ -868,9 +871,9 @@ public class ElectionStateTests
         await electionState.LoseManagerAsync(); // Should be no-op since not manager
 
         // Should still be non-manager
-        electionState.IsManager.Should().BeFalse("Cannot lose leadership when not leader");
-        electionState.ElectedAt.Should().BeNull("No election time when never elected");
-        electionState.LostAt.Should().BeNull("No loss time when never lost leadership");
+        electionState.IsManager.ShouldBeFalse("Cannot lose leadership when not leader");
+        electionState.ElectedAt.ShouldBeNull("No election time when never elected");
+        electionState.LostAt.ShouldBeNull("No loss time when never lost leadership");
 
         // Act: Become leader
         _time.Advance(TimeSpan.FromMinutes(5));
@@ -879,16 +882,16 @@ public class ElectionStateTests
         var electionTime = electionState.ElectedAt;
 
         // Behavioral verification: Business rule - leader status and election time
-        electionState.IsManager.Should().BeTrue("Should be leader after becoming manager");
-        electionTime.Should().NotBeNull("Election time should be recorded");
+        electionState.IsManager.ShouldBeTrue("Should be leader after becoming manager");
+        electionTime.ShouldNotBeNull("Election time should be recorded");
 
         // Act: Try to become leader again (idempotent operation)
         _time.Advance(TimeSpan.FromMinutes(10));
         await electionState.BecomeManagerAsync();
 
         // Behavioral verification: Business rule - idempotent operation preserves original election time
-        electionState.IsManager.Should().BeTrue("Should remain leader");
-        electionState.ElectedAt.Should().Be(electionTime, "Election time should not change on re-election");
+        electionState.IsManager.ShouldBeTrue("Should remain leader");
+        electionState.ElectedAt.ShouldBe(electionTime, "Election time should not change on re-election");
 
         // Act: Lose leadership
         _time.Advance(TimeSpan.FromMinutes(15));
@@ -897,10 +900,9 @@ public class ElectionStateTests
         var lossTime = electionState.LostAt;
 
         // Behavioral verification: Business rule - proper timing relationships
-        electionState.IsManager.Should().BeFalse("Should not be leader after losing leadership");
-        lossTime.Should().NotBeNull("Loss time should be recorded");
-        lossTime.Should().BeAfter(electionTime.Value, "Loss time should be after election time");
+        electionState.IsManager.ShouldBeFalse("Should not be leader after losing leadership");
+        lossTime.ShouldNotBeNull("Loss time should be recorded");
+        lossTime.Value.ShouldBeGreaterThan(electionTime.Value, "Loss time should be after election time");
     }
-
     #endregion
 }

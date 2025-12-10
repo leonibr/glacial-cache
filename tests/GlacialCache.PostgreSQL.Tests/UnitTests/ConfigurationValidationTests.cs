@@ -32,7 +32,7 @@ public class ConfigurationValidationTests
 
         // Act & Assert
         var action = () => ConfigurationValidator.ValidateOptions(options, _logger);
-        action.Should().NotThrow();
+        action.ShouldNotThrow();
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public class ConfigurationValidationTests
     {
         // Act & Assert
         var action = () => ConfigurationValidator.ValidateOptions(null!, _logger);
-        action.Should().Throw<ArgumentNullException>();
+        action.ShouldThrow<ArgumentNullException>();
     }
 
     [Fact]
@@ -62,8 +62,8 @@ public class ConfigurationValidationTests
 
         // Act & Assert
         var action = () => ConfigurationValidator.ValidateOptions(options, _logger);
-        action.Should().Throw<ArgumentException>()
-            .WithMessage("*Connection string cannot be null or empty*");
+        action.ShouldThrow<ArgumentException>()
+            .Message.ShouldContain("Connection string cannot be null or empty");
     }
 
     [Fact]
@@ -85,8 +85,8 @@ public class ConfigurationValidationTests
 
         // Act & Assert
         var action = () => ConfigurationValidator.ValidateOptions(options, _logger);
-        action.Should().Throw<ArgumentException>()
-            .WithMessage("*is not a valid PostgreSQL identifier*");
+        action.ShouldThrow<ArgumentException>()
+            .Message.ShouldContain("is not a valid PostgreSQL identifier");
     }
 
     [Fact]
@@ -108,8 +108,8 @@ public class ConfigurationValidationTests
 
         // Act & Assert
         var action = () => ConfigurationValidator.ValidateOptions(options, _logger);
-        action.Should().Throw<ArgumentException>()
-            .WithMessage("*is not a valid PostgreSQL identifier*");
+        action.ShouldThrow<ArgumentException>()
+            .Message.ShouldContain("is not a valid PostgreSQL identifier");
     }
 
     [Fact]
@@ -131,8 +131,8 @@ public class ConfigurationValidationTests
 
         // Act & Assert
         var action = () => ConfigurationValidator.ValidateOptions(options, _logger);
-        action.Should().Throw<ArgumentException>()
-            .WithMessage("*exceeds PostgreSQL's maximum identifier length of 63 bytes*");
+        action.ShouldThrow<ArgumentException>()
+            .Message.ShouldContain("exceeds PostgreSQL's maximum identifier length of 63 bytes");
     }
 
     [Fact]
@@ -154,8 +154,8 @@ public class ConfigurationValidationTests
 
         // Act & Assert
         var action = () => ConfigurationValidator.ValidateOptions(options, _logger);
-        action.Should().Throw<ArgumentException>()
-            .WithMessage("*exceeds PostgreSQL's maximum identifier length of 63 bytes*");
+        action.ShouldThrow<ArgumentException>()
+            .Message.ShouldContain("exceeds PostgreSQL's maximum identifier length of 63 bytes");
     }
 
     [Fact]
@@ -177,8 +177,8 @@ public class ConfigurationValidationTests
 
         // Act & Assert
         var action = () => ConfigurationValidator.ValidateOptions(options, _logger);
-        action.Should().Throw<ArgumentException>()
-            .WithMessage("*exceeds PostgreSQL's maximum identifier length of 63 bytes*");
+        action.ShouldThrow<ArgumentException>()
+            .Message.ShouldContain("exceeds PostgreSQL's maximum identifier length of 63 bytes");
     }
 
     [Fact]
@@ -200,7 +200,7 @@ public class ConfigurationValidationTests
 
         // Act & Assert
         var action = () => ConfigurationValidator.ValidateOptions(options, _logger);
-        action.Should().NotThrow();
+        action.ShouldNotThrow();
     }
 
     [Fact]
@@ -222,8 +222,8 @@ public class ConfigurationValidationTests
 
         // Act & Assert
         var action = () => ConfigurationValidator.ValidateOptions(options, _logger);
-        action.Should().Throw<ArgumentException>()
-            .WithMessage("*exceeds PostgreSQL's maximum identifier length of 63 bytes*");
+        action.ShouldThrow<ArgumentException>()
+            .Message.ShouldContain("exceeds PostgreSQL's maximum identifier length of 63 bytes");
     }
 
     [Fact]
@@ -247,7 +247,7 @@ public class ConfigurationValidationTests
         var results = ConfigurationValidator.ValidateOptionsNonThrowing(options).ToList();
 
         // Assert
-        results.Should().BeEmpty();
+        results.ShouldBeEmpty();
     }
 
     [Fact]
@@ -257,8 +257,8 @@ public class ConfigurationValidationTests
         var results = ConfigurationValidator.ValidateOptionsNonThrowing(null!).ToList();
 
         // Assert
-        results.Should().HaveCount(1);
-        results[0].ErrorMessage!.Should().Contain("Options cannot be null");
+        results.Count.ShouldBe(1);
+        results[0].ErrorMessage!.ShouldContain("Options cannot be null");
     }
 
     [Fact]
@@ -282,9 +282,9 @@ public class ConfigurationValidationTests
         var results = ConfigurationValidator.ValidateOptionsNonThrowing(options).ToList();
 
         // Assert
-        results.Should().NotBeEmpty();
-        results.Should().Contain(r => r.ErrorMessage!.Contains("Connection string cannot be null or empty"));
-        results.Should().Contain(r => r.ErrorMessage!.Contains("is not a valid PostgreSQL identifier"));
+        results.ShouldNotBeEmpty();
+        results.ShouldContain(r => r.ErrorMessage!.Contains("Connection string cannot be null or empty"));
+        results.ShouldContain(r => r.ErrorMessage!.Contains("is not a valid PostgreSQL identifier"));
     }
 
     [Fact]
@@ -308,8 +308,8 @@ public class ConfigurationValidationTests
         var results = ConfigurationValidator.ValidateOptionsNonThrowing(options).ToList();
 
         // Assert
-        results.Should().NotBeEmpty();
-        results.Should().Contain(r => r.ErrorMessage!.Contains("exceeds PostgreSQL's maximum identifier length of 63 bytes"));
+        results.ShouldNotBeEmpty();
+        results.ShouldContain(r => r.ErrorMessage!.Contains("exceeds PostgreSQL's maximum identifier length of 63 bytes"));
     }
 
     [Fact]
@@ -333,8 +333,8 @@ public class ConfigurationValidationTests
         var results = ConfigurationValidator.ValidateOptionsNonThrowing(options).ToList();
 
         // Assert
-        results.Should().NotBeEmpty();
-        results.Should().Contain(r => r.ErrorMessage!.Contains("exceeds PostgreSQL's maximum identifier length of 63 bytes"));
+        results.ShouldNotBeEmpty();
+        results.ShouldContain(r => r.ErrorMessage!.Contains("exceeds PostgreSQL's maximum identifier length of 63 bytes"));
     }
 
     [Theory]
@@ -366,7 +366,7 @@ public class ConfigurationValidationTests
         if (expected)
         {
             var action = () => ConfigurationValidator.ValidateOptions(options, _logger);
-            action.Should().NotThrow();
+            action.ShouldNotThrow();
         }
         else
         {
@@ -375,13 +375,13 @@ public class ConfigurationValidationTests
             // Empty string and null are caught by Required attribute
             if (string.IsNullOrEmpty(identifier))
             {
-                action.Should().Throw<ArgumentException>()
-                    .WithMessage("*Cache table name is required*");
+                action.ShouldThrow<ArgumentException>()
+                    .Message.ShouldContain("Cache table name is required");
             }
             else
             {
-                action.Should().Throw<ArgumentException>()
-                    .WithMessage("*is not a valid PostgreSQL identifier*");
+                action.ShouldThrow<ArgumentException>()
+                    .Message.ShouldContain("is not a valid PostgreSQL identifier");
             }
         }
     }
@@ -390,6 +390,6 @@ public class ConfigurationValidationTests
     public void MaxPostgreSqlIdentifierLength_ShouldBe63()
     {
         // Assert
-        ConfigurationValidator.MaxPostgreSqlIdentifierLength.Should().Be(63);
+        ConfigurationValidator.MaxPostgreSqlIdentifierLength.ShouldBe(63);
     }
 }

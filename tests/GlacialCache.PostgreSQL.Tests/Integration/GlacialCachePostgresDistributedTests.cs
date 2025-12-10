@@ -115,8 +115,8 @@ public class GlacialCachePostgresDistributedTests : IntegrationTestBase
         var retrievedValue = await _cache.GetAsync(key);
 
         // Assert
-        retrievedValue.Should().NotBeNull();
-        retrievedValue.Should().BeEquivalentTo(value);
+        retrievedValue.ShouldNotBeNull();
+        retrievedValue.ShouldBeEquivalentTo(value);
     }
 
     [Fact]
@@ -129,7 +129,7 @@ public class GlacialCachePostgresDistributedTests : IntegrationTestBase
         var result = await _cache!.GetAsync(key);
 
         // Assert
-        result.Should().BeNull();
+        result.ShouldBeNull();
     }
 
     [Fact]
@@ -146,6 +146,6 @@ public class GlacialCachePostgresDistributedTests : IntegrationTestBase
         var retrievedValue = await _cache.GetAsync(key);
 
         // Assert
-        retrievedValue.Should().BeNull();
+        retrievedValue.ShouldBeNull();
     }
 }

@@ -123,8 +123,8 @@ public class MultiInstanceElectionTests : IntegrationTestBase
             var isManager = await managerElectionService.TryAcquireManagerRoleAsync();
 
             // Assert
-            isManager.Should().BeTrue();
-            managerElectionService.IsManager.Should().BeTrue();
+            isManager.ShouldBeTrue();
+            managerElectionService.IsManager.ShouldBeTrue();
         }
         finally
         {
@@ -162,7 +162,7 @@ public class MultiInstanceElectionTests : IntegrationTestBase
 
             // Assert - Only one should be manager
             var managerCount = results.Count(r => r);
-            managerCount.Should().Be(1);
+            managerCount.ShouldBe(1);
 
             // Verify state consistency
             var isManager1 = managerElectionService1.IsManager;
@@ -170,7 +170,7 @@ public class MultiInstanceElectionTests : IntegrationTestBase
             var isManager3 = managerElectionService3.IsManager;
 
             var totalManagers = new[] { isManager1, isManager2, isManager3 }.Count(m => m);
-            totalManagers.Should().Be(1);
+            totalManagers.ShouldBe(1);
 
             Output.WriteLine($"Manager election results: Instance1={isManager1}, Instance2={isManager2}, Instance3={isManager3}");
         }
@@ -201,18 +201,18 @@ public class MultiInstanceElectionTests : IntegrationTestBase
         {
             // Act - First instance becomes manager
             var isManager1 = await managerElectionService1.TryAcquireManagerRoleAsync();
-            isManager1.Should().BeTrue();
+            isManager1.ShouldBeTrue();
 
             // Second instance should not be manager
             var isManager2 = await managerElectionService2.TryAcquireManagerRoleAsync();
-            isManager2.Should().BeFalse();
+            isManager2.ShouldBeFalse();
 
             // Simulate failure of first instance
             await managerElectionService1.ReleaseManagerRoleAsync();
 
             // Second instance should now be able to become manager
             isManager2 = await managerElectionService2.TryAcquireManagerRoleAsync();
-            isManager2.Should().BeTrue();
+            isManager2.ShouldBeTrue();
 
             Output.WriteLine("Failover test completed successfully");
         }
@@ -241,18 +241,18 @@ public class MultiInstanceElectionTests : IntegrationTestBase
         {
             // Act - First instance becomes manager
             var isManager1 = await managerElectionService1.TryAcquireManagerRoleAsync();
-            isManager1.Should().BeTrue();
+            isManager1.ShouldBeTrue();
 
             // Second instance should not be manager
             var isManager2 = await managerElectionService2.TryAcquireManagerRoleAsync();
-            isManager2.Should().BeFalse();
+            isManager2.ShouldBeFalse();
 
             // First instance voluntarily yields
             await managerElectionService1.ReleaseManagerRoleAsync();
 
             // Second instance should now be able to become manager
             isManager2 = await managerElectionService2.TryAcquireManagerRoleAsync();
-            isManager2.Should().BeTrue();
+            isManager2.ShouldBeTrue();
 
             Output.WriteLine("Voluntary yield test completed successfully");
         }
@@ -298,16 +298,16 @@ public class MultiInstanceElectionTests : IntegrationTestBase
             var instance2Results = results.Where((_, index) => index % 2 == 1).ToList();
 
             // All results for instance 1 should be the same
-            instance1Results.All(r => r == instance1Results[0]).Should().BeTrue();
+            instance1Results.All(r => r == instance1Results[0]).ShouldBeTrue();
             // All results for instance 2 should be the same
-            instance2Results.All(r => r == instance2Results[0]).Should().BeTrue();
+            instance2Results.All(r => r == instance2Results[0]).ShouldBeTrue();
 
             // Only one instance should be manager
             var instance1IsManager = instance1Results[0];
             var instance2IsManager = instance2Results[0];
 
-            (instance1IsManager && instance2IsManager).Should().BeFalse(); // Both can't be manager
-            (instance1IsManager || instance2IsManager).Should().BeTrue();  // At least one should be manager
+            (instance1IsManager && instance2IsManager).ShouldBeFalse(); // Both can't be manager
+            (instance1IsManager || instance2IsManager).ShouldBeTrue();  // At least one should be manager
 
             Output.WriteLine($"Concurrent access test completed. Instance1: {instance1IsManager}, Instance2: {instance2IsManager}");
         }
@@ -348,18 +348,18 @@ public class MultiInstanceElectionTests : IntegrationTestBase
             var endTime = DateTimeOffset.UtcNow;
 
             // Assert
-            isManager.Should().BeTrue();
-            electedEvents.Should().HaveCount(1);
-            lostEvents.Should().HaveCount(1);
+            isManager.ShouldBeTrue();
+            electedEvents.Count.ShouldBe(1);
+            lostEvents.Count.ShouldBe(1);
 
-            electedEvents[0].InstanceId.Should().NotBeNullOrEmpty();
-            electedEvents[0].ElectedAt.Should().BeOnOrAfter(startTime);
-            electedEvents[0].ElectedAt.Should().BeOnOrBefore(afterAcquireTime);
+            electedEvents[0].InstanceId.ShouldNotBeNullOrEmpty();
+            electedEvents[0].ElectedAt.ShouldBeGreaterThanOrEqualTo(startTime);
+            electedEvents[0].ElectedAt.ShouldBeLessThanOrEqualTo(afterAcquireTime);
 
-            lostEvents[0].InstanceId.Should().NotBeNullOrEmpty();
-            lostEvents[0].LostAt.Should().BeOnOrAfter(afterAcquireTime);
-            lostEvents[0].LostAt.Should().BeOnOrBefore(endTime);
-            lostEvents[0].Reason.Should().Be("Manual release");
+            lostEvents[0].InstanceId.ShouldNotBeNullOrEmpty();
+            lostEvents[0].LostAt.ShouldBeGreaterThanOrEqualTo(afterAcquireTime);
+            lostEvents[0].LostAt.ShouldBeLessThanOrEqualTo(endTime);
+            lostEvents[0].Reason.ShouldBe("Manual release");
         }
         finally
         {

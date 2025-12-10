@@ -336,7 +336,7 @@ public class PostgresDataSourceTests
         var act = () => options.Connection.ConnectionStringObservable.Value = invalidConnectionString;
 
         // Assert - No exception thrown
-        act.Should().NotThrow();
+        act.ShouldNotThrow();
 
         // Assert - Logging still occurs (graceful degradation)
         _loggerMock.Verify(

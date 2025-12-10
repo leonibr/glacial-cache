@@ -134,11 +134,11 @@ public class SerializerIntegrationTests : IntegrationTestBase
         var retrievedObject = retrievedEntry?.Value;
 
         // Assert
-        serializer.Should().BeOfType<MemoryPackCacheEntrySerializer>();
-        retrievedObject.Should().BeEquivalentTo(testObject);
-        retrievedObject.Id.Should().Be(testObject.Id);
-        retrievedObject.Name.Should().Be(testObject.Name);
-        retrievedObject.Items.Should().BeEquivalentTo(testObject.Items);
+        serializer.ShouldBeOfType<MemoryPackCacheEntrySerializer>();
+        retrievedObject.ShouldBeEquivalentTo(testObject);
+        retrievedObject.Id.ShouldBe(testObject.Id);
+        retrievedObject.Name.ShouldBe(testObject.Name);
+        retrievedObject.Items.ShouldBeEquivalentTo(testObject.Items);
     }
 
     [Fact]
@@ -162,11 +162,11 @@ public class SerializerIntegrationTests : IntegrationTestBase
         var retrievedObject = retrievedEntry?.Value;
 
         // Assert
-        serializer.Should().BeOfType<JsonCacheEntrySerializer>();
-        retrievedObject.Should().BeEquivalentTo(testObject);
-        retrievedObject.Id.Should().Be(testObject.Id);
-        retrievedObject.Name.Should().Be(testObject.Name);
-        retrievedObject.Items.Should().BeEquivalentTo(testObject.Items);
+        serializer.ShouldBeOfType<JsonCacheEntrySerializer>();
+        retrievedObject.ShouldBeEquivalentTo(testObject);
+        retrievedObject.Id.ShouldBe(testObject.Id);
+        retrievedObject.Name.ShouldBe(testObject.Name);
+        retrievedObject.Items.ShouldBeEquivalentTo(testObject.Items);
     }
 
     [Fact]
@@ -189,12 +189,13 @@ public class SerializerIntegrationTests : IntegrationTestBase
 
         var retrievedEntry = await cache.GetEntryAsync<TestDataObject>("complex-object-custom");
         var retrievedObject = retrievedEntry?.Value;
+        retrievedObject.ShouldNotBeNull("Retrieved object should not be null");
 
         // Assert
-        serializer.Should().BeOfType<TestCustomSerializer>();
-        retrievedObject.Should().BeEquivalentTo(testObject);
+        serializer.ShouldBeOfType<TestCustomSerializer>();
+        retrievedObject.ShouldBeEquivalentTo(testObject);
         // Custom serializer adds a prefix during serialization but removes it during deserialization
-        retrievedObject.Name.Should().Be(testObject.Name);
+        retrievedObject.Name.ShouldBe(testObject.Name);
     }
 
     [Fact]
@@ -228,7 +229,7 @@ public class SerializerIntegrationTests : IntegrationTestBase
             });
 
             var retrievedString = await cache.GetStringAsync($"string-test-{testCase.Type}");
-            retrievedString.Should().Be(testString);
+            retrievedString.ShouldBe(testString);
 
             // Act & Assert - Byte array operations
             await cache.SetAsync($"bytes-test-{testCase.Type}", testBytes, new DistributedCacheEntryOptions
@@ -238,10 +239,10 @@ public class SerializerIntegrationTests : IntegrationTestBase
 
             var retrievedEntry = await cache.GetEntryAsync<byte[]>($"bytes-test-{testCase.Type}");
             var retrievedBytes = retrievedEntry?.Value;
-            retrievedBytes.Should().BeEquivalentTo(testBytes);
+            retrievedBytes.ShouldBeEquivalentTo(testBytes);
 
             // Verify serializer type
-            serializer.Should().BeOfType(testCase.ExpectedSerializerType);
+            serializer.ShouldBeOfType(testCase.ExpectedSerializerType);
         }
     }
 
@@ -273,7 +274,7 @@ public class SerializerIntegrationTests : IntegrationTestBase
                 });
 
                 var retrievedEntry = await cache.GetEntryAsync<TestDataObject>(key);
-                retrievedEntry.Should().NotBeNull();
+                retrievedEntry.ShouldNotBeNull();
             }
 
             stopwatch.Stop();
@@ -282,7 +283,7 @@ public class SerializerIntegrationTests : IntegrationTestBase
 
         // Assert - MemoryPack should generally be faster than JSON
         // (Allow some tolerance for test environment variations)
-        results[SerializerType.MemoryPack.ToString()].Should().BeLessThan(
+        results[SerializerType.MemoryPack.ToString()].ShouldBeLessThan(
             results[SerializerType.JsonBytes.ToString()] * 1.5); // Allow 50% tolerance
     }
 
@@ -316,16 +317,16 @@ public class SerializerIntegrationTests : IntegrationTestBase
         var retrievedObject = retrievedEntry?.Value;
 
         // Assert - Every field should be preserved exactly
-        retrievedObject.Should().NotBeNull();
-        retrievedObject.Should().BeEquivalentTo(complexObject);
+        retrievedObject.ShouldNotBeNull();
+        retrievedObject.ShouldBeEquivalentTo(complexObject);
 
         // Explicit checks for critical fields
-        retrievedObject.Id.Should().Be(complexObject.Id);
-        retrievedObject.Count.Should().Be(complexObject.Count);
-        retrievedObject.Ratio.Should().Be(complexObject.Ratio);
-        retrievedObject.IsActive.Should().Be(complexObject.IsActive);
-        retrievedObject.CreatedAt.Should().Be(complexObject.CreatedAt);
-        retrievedObject.Items.Should().BeEquivalentTo(complexObject.Items);
+        retrievedObject.Id.ShouldBe(complexObject.Id);
+        retrievedObject.Count.ShouldBe(complexObject.Count);
+        retrievedObject.Ratio.ShouldBe(complexObject.Ratio);
+        retrievedObject.IsActive.ShouldBe(complexObject.IsActive);
+        retrievedObject.CreatedAt.ShouldBe(complexObject.CreatedAt);
+        retrievedObject.Items.ShouldBeEquivalentTo(complexObject.Items);
     }
 
     [Fact]
@@ -356,10 +357,10 @@ public class SerializerIntegrationTests : IntegrationTestBase
 
         var retrievedEntry = await cache.GetEntryAsync<TestDataObject>("edge-case-test");
         var retrievedObject = retrievedEntry?.Value;
-
         // Assert
-        retrievedObject.Should().BeEquivalentTo(edgeCaseObject);
-        retrievedObject.Items.Should().BeEmpty();
+        retrievedObject.ShouldNotBeNull("Retrieved object should not be null");
+        retrievedObject.ShouldBeEquivalentTo(edgeCaseObject);
+        retrievedObject.Items.ShouldBeEmpty();
     }
 
     private static TestDataObject CreateComplexTestObject(string name)

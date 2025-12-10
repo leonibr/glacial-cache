@@ -22,7 +22,7 @@ public class SerializerConfigurationTests
         var options = new CacheOptions();
 
         // Assert
-        options.Serializer.Should().Be(SerializerType.MemoryPack);
+        options.Serializer.ShouldBe(SerializerType.MemoryPack);
     }
 
     [Fact]
@@ -32,7 +32,7 @@ public class SerializerConfigurationTests
         var options = new CacheOptions();
 
         // Assert
-        options.CustomSerializerType.Should().BeNull();
+        options.CustomSerializerType.ShouldBeNull();
     }
 
     [Fact]
@@ -69,7 +69,7 @@ public class SerializerConfigurationTests
         var serializer = serviceProvider.GetRequiredService<ICacheEntrySerializer>();
 
         // Assert
-        serializer.Should().BeOfType<MemoryPackCacheEntrySerializer>();
+        serializer.ShouldBeOfType<MemoryPackCacheEntrySerializer>();
     }
 
     [Fact]
@@ -106,7 +106,7 @@ public class SerializerConfigurationTests
         var serializer = serviceProvider.GetRequiredService<ICacheEntrySerializer>();
 
         // Assert
-        serializer.Should().BeOfType<JsonCacheEntrySerializer>();
+        serializer.ShouldBeOfType<JsonCacheEntrySerializer>();
     }
 
     [Fact]
@@ -144,7 +144,7 @@ public class SerializerConfigurationTests
         var serializer = serviceProvider.GetRequiredService<ICacheEntrySerializer>();
 
         // Assert
-        serializer.Should().BeOfType<TestCustomSerializer>();
+        serializer.ShouldBeOfType<TestCustomSerializer>();
     }
 
     [Fact]
@@ -183,7 +183,7 @@ public class SerializerConfigurationTests
         var exception = Assert.Throws<InvalidOperationException>(() =>
             serviceProvider.GetRequiredService<ICacheEntrySerializer>());
 
-        exception.Message.Should().Be("CustomSerializerType must be specified when using SerializerType.Custom");
+        exception.Message.ShouldBe("CustomSerializerType must be specified when using SerializerType.Custom");
     }
 
     [Fact]
@@ -222,7 +222,7 @@ public class SerializerConfigurationTests
         var exception = Assert.Throws<InvalidOperationException>(() =>
             serviceProvider.GetRequiredService<ICacheEntrySerializer>());
 
-        exception.Message.Should().Be("Custom serializer type String must implement ICacheEntrySerializer");
+        exception.Message.ShouldBe("Custom serializer type String must implement ICacheEntrySerializer");
     }
 
     [Fact]
@@ -237,8 +237,8 @@ public class SerializerConfigurationTests
         var deserialized = serializer.Deserialize<string>(serialized);
 
         // Assert
-        deserialized.Should().Be(originalValue);
-        Encoding.UTF8.GetString(serialized).Should().Be(originalValue);
+        deserialized.ShouldBe(originalValue);
+        Encoding.UTF8.GetString(serialized).ShouldBe(originalValue);
     }
 
     [Fact]
@@ -253,8 +253,8 @@ public class SerializerConfigurationTests
         var deserialized = serializer.Deserialize<byte[]>(serialized);
 
         // Assert
-        deserialized.Should().BeEquivalentTo(originalValue);
-        serialized.Should().BeSameAs(originalValue); // Should be pass-through for byte arrays
+        deserialized.ShouldBeEquivalentTo(originalValue);
+        serialized.ShouldBeSameAs(originalValue); // Should be pass-through for byte arrays
     }
 
     [Fact]
@@ -274,10 +274,10 @@ public class SerializerConfigurationTests
         var deserialized = serializer.Deserialize<TestObject>(serialized);
 
         // Assert
-        deserialized.Should().BeEquivalentTo(originalValue);
-        deserialized.Id.Should().Be(42);
-        deserialized.Name.Should().Be("Test Object");
-        deserialized.Values.Should().BeEquivalentTo(new List<int> { 1, 2, 3, 4, 5 });
+        deserialized.ShouldBeEquivalentTo(originalValue);
+        deserialized.Id.ShouldBe(42);
+        deserialized.Name.ShouldBe("Test Object");
+        deserialized.Values.ShouldBeEquivalentTo(new List<int> { 1, 2, 3, 4, 5 });
     }
 
     [Fact]
@@ -292,8 +292,8 @@ public class SerializerConfigurationTests
         var deserialized = serializer.Deserialize<string>(serialized);
 
         // Assert
-        deserialized.Should().Be(originalValue);
-        Encoding.UTF8.GetString(serialized).Should().Be(originalValue);
+        deserialized.ShouldBe(originalValue);
+        Encoding.UTF8.GetString(serialized).ShouldBe(originalValue);
     }
 
     [Fact]
@@ -308,8 +308,8 @@ public class SerializerConfigurationTests
         var deserialized = serializer.Deserialize<byte[]>(serialized);
 
         // Assert
-        deserialized.Should().BeEquivalentTo(originalValue);
-        serialized.Should().BeSameAs(originalValue); // Should be pass-through for byte arrays
+        deserialized.ShouldBeEquivalentTo(originalValue);
+        serialized.ShouldBeSameAs(originalValue); // Should be pass-through for byte arrays
     }
 
     [Fact]
@@ -329,10 +329,10 @@ public class SerializerConfigurationTests
         var deserialized = serializer.Deserialize<TestObject>(serialized);
 
         // Assert
-        deserialized.Should().BeEquivalentTo(originalValue);
-        deserialized.Id.Should().Be(42);
-        deserialized.Name.Should().Be("Test Object");
-        deserialized.Values.Should().BeEquivalentTo(new List<int> { 1, 2, 3, 4, 5 });
+        deserialized.ShouldBeEquivalentTo(originalValue);
+        deserialized.Id.ShouldBe(42);
+        deserialized.Name.ShouldBe("Test Object");
+        deserialized.Values.ShouldBeEquivalentTo(new List<int> { 1, 2, 3, 4, 5 });
     }
 
     [Fact]
@@ -349,7 +349,7 @@ public class SerializerConfigurationTests
         // Assert
         // The serializer adds "CUSTOM:" prefix during serialization and removes it during deserialization
         // So the round-trip should return the original value
-        deserialized.Should().Be(originalValue);
+        deserialized.ShouldBe(originalValue);
     }
 
     [Fact]
@@ -359,9 +359,9 @@ public class SerializerConfigurationTests
         var serializer = new MemoryPackCacheEntrySerializer();
 
         // Act & Assert
-        serializer.IsByteArray<string>().Should().BeFalse();
-        serializer.IsByteArray<int>().Should().BeFalse();
-        serializer.IsByteArray<byte[]>().Should().BeTrue();
+        serializer.IsByteArray<string>().ShouldBeFalse();
+        serializer.IsByteArray<int>().ShouldBeFalse();
+        serializer.IsByteArray<byte[]>().ShouldBeTrue();
     }
 
     [Fact]
@@ -371,10 +371,10 @@ public class SerializerConfigurationTests
         var serializer = new MemoryPackCacheEntrySerializer();
 
         // Act & Assert
-        serializer.GetBaseType<string>().Should().Be("System.String");
-        serializer.GetBaseType<int>().Should().Be("System.Int32");
-        serializer.GetBaseType<byte[]>().Should().Be("System.Byte[]");
-        serializer.GetBaseType<TestObject>().Should().Be("GlacialCache.PostgreSQL.Tests.UnitTests.TestObject");
+        serializer.GetBaseType<string>().ShouldBe("System.String");
+        serializer.GetBaseType<int>().ShouldBe("System.Int32");
+        serializer.GetBaseType<byte[]>().ShouldBe("System.Byte[]");
+        serializer.GetBaseType<TestObject>().ShouldBe("GlacialCache.PostgreSQL.Tests.UnitTests.TestObject");
     }
 
     // Helper method to create custom serializer (copied from ServiceCollectionExtensions)

@@ -1,5 +1,4 @@
 using GlacialCache.PostgreSQL.Serializers;
-using FluentAssertions;
 using Xunit;
 
 namespace GlacialCache.PostgreSQL.Tests.UnitTests;
@@ -30,11 +29,11 @@ public class SerializerMemoryEfficiencyTests
         var deserialized = serializer.Deserialize<byte[]>(serialized);
 
         // Assert - Verify correctness first
-        deserialized.Should().BeEquivalentTo(testBytes);
+        deserialized.ShouldBeEquivalentTo(testBytes);
 
         // Assert - Verify memory efficiency optimization (pass-through without copying)
         // This is an implementation detail but important for memory efficiency
-        serialized.Should().BeSameAs(testBytes, "Serializer should pass-through byte arrays to avoid unnecessary copies");
-        deserialized.Should().BeSameAs(testBytes, "Deserializer should pass-through byte arrays to avoid unnecessary copies");
+        serialized.ShouldBeSameAs(testBytes, "Serializer should pass-through byte arrays to avoid unnecessary copies");
+        deserialized.ShouldBeSameAs(testBytes, "Deserializer should pass-through byte arrays to avoid unnecessary copies");
     }
 }

@@ -16,10 +16,10 @@ public sealed class CacheEntryTests
         var first = entry.SerializedData;
         var second = entry.SerializedData;
 
-        first.Span.Length.Should().BeGreaterThan(0);
+        first.Span.Length.ShouldBeGreaterThan(0);
         // Same buffer instance reused
-        second.Span.ToArray().Should().BeEquivalentTo(first.Span.ToArray());
-        entry.SizeInBytes.Should().Be(first.Length);
+        second.Span.ToArray().ShouldBeEquivalentTo(first.Span.ToArray());
+        entry.SizeInBytes.ShouldBe(first.Length);
     }
 
     [Fact]
@@ -29,9 +29,9 @@ public sealed class CacheEntryTests
         var bytes = entry.SerializedData.ToArray();
         var deserializedEntry = CacheEntryTestHelper.FromSerializedData<string>("k", bytes);
 
-        deserializedEntry.Value.Should().Be("payload");
+        deserializedEntry.Value.ShouldBe("payload");
         // SerializedData should not change after deserialization
-        entry.SerializedData.ToArray().Should().BeEquivalentTo(bytes);
+        entry.SerializedData.ToArray().ShouldBeEquivalentTo(bytes);
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public sealed class CacheEntryTests
         var entry = CacheEntryTestHelper.CreateUnserialized("k", "v");
         // Force serialization
         var buf = entry.SerializedData;
-        buf.Length.Should().BeGreaterThan(0);
+        buf.Length.ShouldBeGreaterThan(0);
     }
 
     // ===== NEW TESTS FOR CacheEntry<T> =====
@@ -55,11 +55,11 @@ public sealed class CacheEntryTests
 
         var entry = CacheEntryTestHelper.Create(key, value, absoluteExpiration, slidingExpiration);
 
-        entry.Key.Should().Be(key);
-        entry.Value.Should().Be(value);
-        entry.AbsoluteExpiration.Should().Be(absoluteExpiration);
-        entry.SlidingExpiration.Should().Be(slidingExpiration);
-        entry.BaseType.Should().Be(typeof(string).FullName);
+        entry.Key.ShouldBe(key);
+        entry.Value.ShouldBe(value);
+        entry.AbsoluteExpiration.ShouldBe(absoluteExpiration);
+        entry.SlidingExpiration.ShouldBe(slidingExpiration);
+        entry.BaseType.ShouldBe(typeof(string).FullName);
     }
 
     [Fact]
@@ -67,7 +67,7 @@ public sealed class CacheEntryTests
     {
         var action = () => CacheEntryTestHelper.Create(null!, "test-value", null, null);
 
-        action.Should().Throw<ArgumentException>();
+        action.ShouldThrow<ArgumentException>();
     }
 
     [Fact]
@@ -75,9 +75,9 @@ public sealed class CacheEntryTests
     {
         var entry = CacheEntryTestHelper.Create<string>("test-key", null!, null, null);
 
-        entry.Should().NotBeNull();
-        entry.Value.Should().BeNull();
-        entry.Key.Should().Be("test-key");
+        entry.ShouldNotBeNull();
+        entry.Value.ShouldBeNull();
+        entry.Key.ShouldBe("test-key");
     }
 
 
@@ -89,7 +89,7 @@ public sealed class CacheEntryTests
     {
         var entry = CacheEntryTestHelper.Create("k", "hello world", null, null);
 
-        entry.SizeInBytes.Should().Be(entry.SerializedData.Length);
+        entry.SizeInBytes.ShouldBe(entry.SerializedData.Length);
     }
 
     [Fact]
@@ -98,9 +98,9 @@ public sealed class CacheEntryTests
         var entry = CacheEntryTestHelper.Create("k", "test value", null, null);
         var serialized = entry.SerializedData;
 
-        serialized.Length.Should().BeGreaterThan(0);
+        serialized.Length.ShouldBeGreaterThan(0);
         var deserializedEntry = CacheEntryTestHelper.FromSerializedData<string>("k", serialized.ToArray());
-        deserializedEntry.Value.Should().Be("test value");
+        deserializedEntry.Value.ShouldBe("test value");
     }
 
     [Fact]
@@ -111,7 +111,7 @@ public sealed class CacheEntryTests
         var second = entry.SerializedData;
 
         // Should be the same buffer instance
-        first.ToArray().Should().BeEquivalentTo(second.ToArray());
+        first.ToArray().ShouldBeEquivalentTo(second.ToArray());
     }
 
     [Fact]
@@ -126,10 +126,10 @@ public sealed class CacheEntryTests
         var entry = CacheEntryTestHelper.FromSerializedData<string>(
             "k", serialized, absoluteExpiration, slidingExpiration);
 
-        entry.Value.Should().Be("test value");
-        entry.AbsoluteExpiration.Should().Be(absoluteExpiration);
-        entry.SlidingExpiration.Should().Be(slidingExpiration);
-        entry.SerializedData.ToArray().Should().BeEquivalentTo(serialized);
+        entry.Value.ShouldBe("test value");
+        entry.AbsoluteExpiration.ShouldBe(absoluteExpiration);
+        entry.SlidingExpiration.ShouldBe(slidingExpiration);
+        entry.SerializedData.ToArray().ShouldBeEquivalentTo(serialized);
     }
 
     [Fact]
@@ -139,11 +139,11 @@ public sealed class CacheEntryTests
 
         var action = () => CacheEntryTestHelper.FromSerializedData<string>("k", invalidData);
         // The factory may handle invalid data gracefully, so let's just verify it doesn't crash
-        var result = action.Should().NotThrow();
+        action.ShouldNotThrow();
 
         // If it doesn't throw, the result should be a valid CacheEntry
         var entry = CacheEntryTestHelper.FromSerializedData<string>("k", invalidData);
-        entry.Should().NotBeNull();
+        entry.ShouldNotBeNull();
     }
 
     [Fact]
@@ -152,11 +152,11 @@ public sealed class CacheEntryTests
         var entry = CacheEntryTestHelper.CreateUnserialized("k", "test value");
 
         // Accessing Value should not trigger serialization
-        entry.Value.Should().Be("test value");
+        entry.Value.ShouldBe("test value");
 
         // SerializedData should be null until accessed
         var serialized = entry.SerializedData;
-        serialized.Length.Should().BeGreaterThan(0);
+        serialized.Length.ShouldBeGreaterThan(0);
     }
 
 
@@ -180,7 +180,7 @@ public sealed class CacheEntryTests
         var serialized = entry.SerializedData;
 
         var deserializedEntry = CacheEntryTestHelper.FromSerializedData<ComplexTestObject>("complex", serialized.ToArray());
-        deserializedEntry.Value.Should().BeEquivalentTo(complexObject);
+        deserializedEntry.Value.ShouldBeEquivalentTo(complexObject);
     }
 
     [Fact]
@@ -188,11 +188,11 @@ public sealed class CacheEntryTests
     {
         var entry = CacheEntryTestHelper.Create("k", "v", null, null) as ICacheEntry;
 
-        entry.Should().NotBeNull();
-        entry!.Key.Should().Be("k");
-        entry.SerializedData.Length.Should().BeGreaterThan(0);
-        entry.BaseType.Should().Be(typeof(string).FullName);
-        entry.SizeInBytes.Should().BeGreaterThan(0);
+        entry.ShouldNotBeNull();
+        entry!.Key.ShouldBe("k");
+        entry.SerializedData.Length.ShouldBeGreaterThan(0);
+        entry.BaseType.ShouldBe(typeof(string).FullName);
+        entry.SizeInBytes.ShouldBeGreaterThan(0);
     }
 
     [Fact]
@@ -204,7 +204,7 @@ public sealed class CacheEntryTests
         var serialized = entry.SerializedData;
         var deserializedEntry = CacheEntryTestHelper.FromSerializedData<int>("int-key", serialized.ToArray());
 
-        deserializedEntry.Value.Should().Be(valueType);
+        deserializedEntry.Value.ShouldBe(valueType);
     }
 
     [Fact]
@@ -216,7 +216,7 @@ public sealed class CacheEntryTests
         var serialized = entry.SerializedData;
         var deserializedEntry = CacheEntryTestHelper.FromSerializedData<DateTime>("datetime-key", serialized.ToArray());
 
-        deserializedEntry.Value.Should().Be(dateTime);
+        deserializedEntry.Value.ShouldBe(dateTime);
     }
 
     [Fact]
@@ -228,7 +228,7 @@ public sealed class CacheEntryTests
         var serialized = entry.SerializedData;
         var deserializedEntry = CacheEntryTestHelper.FromSerializedData<int[]>("array-key", serialized.ToArray());
 
-        deserializedEntry.Value.Should().BeEquivalentTo(array);
+        deserializedEntry.Value.ShouldBeEquivalentTo(array);
     }
 
     [Fact]
@@ -240,7 +240,7 @@ public sealed class CacheEntryTests
         var serialized = entry.SerializedData;
         var deserializedEntry = CacheEntryTestHelper.FromSerializedData<List<string>>("list-key", serialized.ToArray());
 
-        deserializedEntry.Value.Should().BeEquivalentTo(list);
+        deserializedEntry.Value.ShouldBeEquivalentTo(list);
     }
 
     [Fact]
@@ -257,7 +257,7 @@ public sealed class CacheEntryTests
         var serialized = entry.SerializedData;
         var deserializedEntry = CacheEntryTestHelper.FromSerializedData<Dictionary<string, int>>("dict-key", serialized.ToArray());
 
-        deserializedEntry.Value.Should().BeEquivalentTo(dict);
+        deserializedEntry.Value.ShouldBeEquivalentTo(dict);
     }
 
 

@@ -10,7 +10,6 @@ using GlacialCache.PostgreSQL.Services;
 using Xunit.Abstractions;
 using Npgsql;
 using System.Text;
-using FluentAssertions;
 using GlacialCache.PostgreSQL.Abstractions;
 
 namespace GlacialCache.PostgreSQL.Tests.Integration;
@@ -139,7 +138,7 @@ public sealed class DynamicTableSchemaChangeIntegrationTest : IntegrationTestBas
 
         await _distributedCache!.SetStringAsync(initialKey, initialValue);
         var retrieved1 = await _distributedCache.GetStringAsync(initialKey);
-        retrieved1.Should().Be(initialValue, "Cache should work with initial table");
+        retrieved1.ShouldBe(initialValue, "Cache should work with initial table");
 
         // Act - Change table name at runtime
         const string newTableName = "test_table_2";
@@ -157,11 +156,11 @@ public sealed class DynamicTableSchemaChangeIntegrationTest : IntegrationTestBas
 
         await _distributedCache.SetStringAsync(newKey, newValue);
         var retrieved2 = await _distributedCache.GetStringAsync(newKey);
-        retrieved2.Should().Be(newValue, "Cache operations should work with new table name");
+        retrieved2.ShouldBe(newValue, "Cache operations should work with new table name");
 
         // Verify old table data is not accessible (cache should not find it in new table)
         var oldRetrieved = await _distributedCache.GetStringAsync(initialKey);
-        oldRetrieved.Should().BeNull("Old table data should not be accessible after table name change");
+        oldRetrieved.ShouldBeNull("Old table data should not be accessible after table name change");
     }
 
     [Fact]
@@ -173,7 +172,7 @@ public sealed class DynamicTableSchemaChangeIntegrationTest : IntegrationTestBas
 
         await _distributedCache!.SetStringAsync(initialKey, initialValue);
         var retrieved1 = await _distributedCache.GetStringAsync(initialKey);
-        retrieved1.Should().Be(initialValue, "Cache should work with initial schema");
+        retrieved1.ShouldBe(initialValue, "Cache should work with initial schema");
 
         // Act - Change schema name at runtime
         const string newSchemaName = "test_schema_2";
@@ -191,11 +190,11 @@ public sealed class DynamicTableSchemaChangeIntegrationTest : IntegrationTestBas
 
         await _distributedCache.SetStringAsync(newKey, newValue);
         var retrieved2 = await _distributedCache.GetStringAsync(newKey);
-        retrieved2.Should().Be(newValue, "Cache operations should work with new schema name");
+        retrieved2.ShouldBe(newValue, "Cache operations should work with new schema name");
 
         // Verify old schema data is not accessible
         var oldRetrieved = await _distributedCache.GetStringAsync(initialKey);
-        oldRetrieved.Should().BeNull("Old schema data should not be accessible after schema name change");
+        oldRetrieved.ShouldBeNull("Old schema data should not be accessible after schema name change");
     }
 
     [Fact]
@@ -207,7 +206,7 @@ public sealed class DynamicTableSchemaChangeIntegrationTest : IntegrationTestBas
 
         await _distributedCache!.SetStringAsync(initialKey, initialValue);
         var retrieved1 = await _distributedCache.GetStringAsync(initialKey);
-        retrieved1.Should().Be(initialValue, "Cache should work with initial table/schema");
+        retrieved1.ShouldBe(initialValue, "Cache should work with initial table/schema");
 
         // Act - Change both table and schema names at runtime
         const string newSchemaName = "test_schema_3";
@@ -228,11 +227,11 @@ public sealed class DynamicTableSchemaChangeIntegrationTest : IntegrationTestBas
 
         await _distributedCache.SetStringAsync(newKey, newValue);
         var retrieved2 = await _distributedCache.GetStringAsync(newKey);
-        retrieved2.Should().Be(newValue, "Cache operations should work with new table and schema names");
+        retrieved2.ShouldBe(newValue, "Cache operations should work with new table and schema names");
 
         // Verify old table/schema data is not accessible
         var oldRetrieved = await _distributedCache.GetStringAsync(initialKey);
-        oldRetrieved.Should().BeNull("Old table/schema data should not be accessible after both names change");
+        oldRetrieved.ShouldBeNull("Old table/schema data should not be accessible after both names change");
     }
 
     [Fact]
@@ -244,7 +243,7 @@ public sealed class DynamicTableSchemaChangeIntegrationTest : IntegrationTestBas
 
         await _distributedCache!.SetStringAsync(oldTableKey, oldTableValue);
         var retrievedOld = await _distributedCache.GetStringAsync(oldTableKey);
-        retrievedOld.Should().Be(oldTableValue);
+        retrievedOld.ShouldBe(oldTableValue);
 
         // Act - Change table name and create new table
         const string newTableName = "test_table_4";
@@ -259,12 +258,12 @@ public sealed class DynamicTableSchemaChangeIntegrationTest : IntegrationTestBas
 
         await _distributedCache.SetStringAsync(newTableKey, newTableValue);
         var retrievedNew = await _distributedCache.GetStringAsync(newTableKey);
-        retrievedNew.Should().Be(newTableValue, "New table should work");
+        retrievedNew.ShouldBe(newTableValue, "New table should work");
 
         // Verify old table data is still in database but not accessible through cache
         // (This verifies the cache is using the new table, not the old one)
         var oldRetrieved = await _distributedCache.GetStringAsync(oldTableKey);
-        oldRetrieved.Should().BeNull("Cache should use new table, so old table data should not be accessible");
+        oldRetrieved.ShouldBeNull("Cache should use new table, so old table data should not be accessible");
 
         // Verify we can still access old data directly from database (proving it exists but cache uses new table)
         await using var connection = await _dataSource!.OpenConnectionAsync();
@@ -273,7 +272,7 @@ public sealed class DynamicTableSchemaChangeIntegrationTest : IntegrationTestBas
             connection);
         checkOldCmd.Parameters.AddWithValue("key", oldTableKey);
         var oldValueFromDb = await checkOldCmd.ExecuteScalarAsync() as byte[];
-        oldValueFromDb.Should().NotBeNull("Old table data should still exist in database");
-        Encoding.UTF8.GetString(oldValueFromDb!).Should().Be(oldTableValue);
+        oldValueFromDb.ShouldNotBeNull("Old table data should still exist in database");
+        Encoding.UTF8.GetString(oldValueFromDb!).ShouldBe(oldTableValue);
     }
 }

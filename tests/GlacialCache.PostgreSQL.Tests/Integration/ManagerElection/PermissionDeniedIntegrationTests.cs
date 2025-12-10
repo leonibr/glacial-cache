@@ -249,7 +249,7 @@ public class PermissionDeniedIntegrationTests : IntegrationTestBase
 
         // Act & Assert
         // The application should start successfully even with permission denied
-        GlacialCache.Should().NotBeNull();
+        GlacialCache.ShouldNotBeNull();
 
         // Verify that the application is still functional
         var testKey = "test_key";
@@ -263,7 +263,7 @@ public class PermissionDeniedIntegrationTests : IntegrationTestBase
         var retrievedBytes = await GlacialCache.GetAsync(testKey);
         var retrievedValue = retrievedBytes != null ? System.Text.Encoding.UTF8.GetString(retrievedBytes) : null;
 
-        retrievedValue.Should().Be(testValue);
+        retrievedValue.ShouldBe(testValue);
 
         Output.WriteLine("✅ Application continues to function despite permission denied for advisory locks");
     }
@@ -301,12 +301,12 @@ public class PermissionDeniedIntegrationTests : IntegrationTestBase
         var nonCleanupValue = nonCleanupBytes != null ? System.Text.Encoding.UTF8.GetString(nonCleanupBytes) : null;
 
         // Assert
-        cleanupValue.Should().Be("cleanup_value");
-        nonCleanupValue.Should().Be("non_cleanup_value");
+        cleanupValue.ShouldBe("cleanup_value");
+        nonCleanupValue.ShouldBe("non_cleanup_value");
 
         // Verify that both instances can operate independently
-        cleanupGlacialCache.Should().NotBeNull();
-        nonCleanupGlacialCache.Should().NotBeNull();
+        cleanupGlacialCache.ShouldNotBeNull();
+        nonCleanupGlacialCache.ShouldNotBeNull();
 
         Output.WriteLine("✅ Manual coordination works with EnableManagerElection=false");
     }
@@ -369,13 +369,13 @@ public class PermissionDeniedIntegrationTests : IntegrationTestBase
 
         // Assert
         var errorMessages = logMessages.Where(msg => msg.Contains("Advisory lock permission denied")).ToList();
-        errorMessages.Should().NotBeEmpty();
+        errorMessages.ShouldNotBeEmpty();
 
         var permissionDeniedMessage = errorMessages.First();
-        permissionDeniedMessage.Should().Contain("Automatic coordination disabled");
-        permissionDeniedMessage.Should().Contain("GRANT EXECUTE ON FUNCTION pg_try_advisory_lock");
-        permissionDeniedMessage.Should().Contain("CreateInfrastructure=false");
-        permissionDeniedMessage.Should().Contain("Manually coordinate schema creation");
+        permissionDeniedMessage.ShouldContain("Automatic coordination disabled");
+        permissionDeniedMessage.ShouldContain("GRANT EXECUTE ON FUNCTION pg_try_advisory_lock");
+        permissionDeniedMessage.ShouldContain("CreateInfrastructure=false");
+        permissionDeniedMessage.ShouldContain("Manually coordinate schema creation");
 
         Output.WriteLine($"✅ Clear error message logged: {permissionDeniedMessage}");
     }
@@ -439,8 +439,8 @@ public class PermissionDeniedIntegrationTests : IntegrationTestBase
         var value2 = value2Bytes != null ? System.Text.Encoding.UTF8.GetString(value2Bytes) : null;
 
         // Assert
-        value1.Should().Be("instance1_value");
-        value2.Should().Be("instance2_value");
+        value1.ShouldBe("instance1_value");
+        value2.ShouldBe("instance2_value");
 
         // Both instances should be able to read each other's data
         var crossValue1Bytes = await glacialCache1.GetAsync("instance2_key");
@@ -449,8 +449,8 @@ public class PermissionDeniedIntegrationTests : IntegrationTestBase
         var crossValue1 = crossValue1Bytes != null ? System.Text.Encoding.UTF8.GetString(crossValue1Bytes) : null;
         var crossValue2 = crossValue2Bytes != null ? System.Text.Encoding.UTF8.GetString(crossValue2Bytes) : null;
 
-        crossValue1.Should().Be("instance2_value");
-        crossValue2.Should().Be("instance1_value");
+        crossValue1.ShouldBe("instance2_value");
+        crossValue2.ShouldBe("instance1_value");
 
         Output.WriteLine("✅ Multiple instances continue to function with manual coordination");
     }

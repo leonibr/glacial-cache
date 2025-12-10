@@ -66,8 +66,8 @@ public class PolicyFactoryTests
         });
 
         // Assert
-        result.Should().Be("success");
-        attemptCount.Should().Be(maxAttempts);
+        result.ShouldBe("success");
+        attemptCount.ShouldBe(maxAttempts);
     }
 
     [Fact]
@@ -87,7 +87,7 @@ public class PolicyFactoryTests
             });
         });
 
-        attemptCount.Should().Be(1); // Should not retry
+        attemptCount.ShouldBe(1); // Should not retry
     }
 
     [Fact]
@@ -109,8 +109,8 @@ public class PolicyFactoryTests
         });
 
         // Assert
-        result.Should().Be("success");
-        attemptCount.Should().Be(3);
+        result.ShouldBe("success");
+        attemptCount.ShouldBe(3);
     }
 
     [Fact]
@@ -132,8 +132,8 @@ public class PolicyFactoryTests
         });
 
         // Assert
-        result.Should().Be("success");
-        attemptCount.Should().Be(3);
+        result.ShouldBe("success");
+        attemptCount.ShouldBe(3);
     }
 
     [Fact]
@@ -162,7 +162,7 @@ public class PolicyFactoryTests
             await policy.ExecuteAsync(async () => "should not execute");
         });
 
-        failureCount.Should().Be(_options.Resilience.CircuitBreaker.FailureThreshold);
+        failureCount.ShouldBe(_options.Resilience.CircuitBreaker.FailureThreshold);
     }
 
     [Fact]
@@ -203,7 +203,7 @@ public class PolicyFactoryTests
 
         // Assert - Circuit breaker should be closed again
         var result = await policy.ExecuteAsync(async () => "success");
-        result.Should().Be("success");
+        result.ShouldBe("success");
     }
 
     [Fact]
@@ -253,7 +253,7 @@ public class PolicyFactoryTests
         });
 
         // Assert
-        result.Should().Be("success");
+        result.ShouldBe("success");
     }
 
     [Fact]
@@ -279,8 +279,8 @@ public class PolicyFactoryTests
         });
 
         // Assert
-        result.Should().Be("success");
-        attemptCount.Should().Be(3); // Should retry twice then succeed
+        result.ShouldBe("success");
+        attemptCount.ShouldBe(3); // Should retry twice then succeed
     }
 
     [Fact]
@@ -303,8 +303,12 @@ public class PolicyFactoryTests
 
         // Assert
         var results = await Task.WhenAll(tasks);
-        results.Should().HaveCount(5);
-        results.Should().Contain("result-0", "result-1", "result-2", "result-3", "result-4");
+        results.Length.ShouldBe(5);
+        results.ShouldContain("result-0");
+        results.ShouldContain("result-1");
+        results.ShouldContain("result-2");
+        results.ShouldContain("result-3");
+        results.ShouldContain("result-4");
     }
 
     [Fact]
@@ -340,10 +344,10 @@ public class PolicyFactoryTests
         var policy = _policyFactory.CreateResiliencePolicy(options);
 
         // Assert
-        policy.Should().NotBeNull();
+        policy.ShouldNotBeNull();
         // Note: We can't easily test the internal structure, but we can verify it executes
         var result = policy.ExecuteAsync(async () => "test").GetAwaiter().GetResult();
-        result.Should().Be("test");
+        result.ShouldBe("test");
     }
 
     [Fact]
@@ -362,9 +366,9 @@ public class PolicyFactoryTests
         var policy = _policyFactory.CreateResiliencePolicy(options);
 
         // Assert
-        policy.Should().NotBeNull();
+        policy.ShouldNotBeNull();
         var result = policy.ExecuteAsync(async () => "test").GetAwaiter().GetResult();
-        result.Should().Be("test");
+        result.ShouldBe("test");
     }
 
     [Theory]
@@ -404,7 +408,7 @@ public class PolicyFactoryTests
             });
         });
 
-        attemptCount.Should().Be(maxAttempts + 1);
+        attemptCount.ShouldBe(maxAttempts + 1);
     }
 
     [Fact]
@@ -479,13 +483,13 @@ public class PolicyFactoryTests
         stopwatch.Stop();
 
         // Assert
-        result.Should().Be("success");
-        attemptCount.Should().Be(3); // 2 retries + 1 success
+        result.ShouldBe("success");
+        attemptCount.ShouldBe(3); // 2 retries + 1 success
 
         // Linear backoff: first retry at 100ms, second at 200ms
         // Total time should be roughly 100ms + 200ms + some overhead
-        stopwatch.Elapsed.Should().BeGreaterThan(TimeSpan.FromMilliseconds(250));
-        stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(400));
+        stopwatch.Elapsed.ShouldBeGreaterThan(TimeSpan.FromMilliseconds(250));
+        stopwatch.Elapsed.ShouldBeLessThan(TimeSpan.FromMilliseconds(400));
     }
 
     [Fact]
@@ -527,13 +531,13 @@ public class PolicyFactoryTests
         stopwatch.Stop();
 
         // Assert
-        result.Should().Be("success");
-        attemptCount.Should().Be(3);
+        result.ShouldBe("success");
+        attemptCount.ShouldBe(3);
 
         // Exponential backoff: first retry at 100ms (base * 2^0), second at 200ms (base * 2^1)
         // Total time should be roughly 100ms + 200ms + some overhead
-        stopwatch.Elapsed.Should().BeGreaterThan(TimeSpan.FromMilliseconds(250));
-        stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(400));
+        stopwatch.Elapsed.ShouldBeGreaterThan(TimeSpan.FromMilliseconds(250));
+        stopwatch.Elapsed.ShouldBeLessThan(TimeSpan.FromMilliseconds(400));
     }
 
     [Fact]
@@ -579,7 +583,7 @@ public class PolicyFactoryTests
             stopwatch.Stop();
 
             totalTimes.Add(stopwatch.Elapsed);
-            result.Should().Be("success");
+            result.ShouldBe("success");
         }
 
         // Assert - With jitter, times should vary but be within reasonable bounds
@@ -587,13 +591,13 @@ public class PolicyFactoryTests
         // Total should be roughly 700ms with jitter variations
         foreach (var time in totalTimes)
         {
-            time.Should().BeGreaterThan(TimeSpan.FromMilliseconds(500));
-            time.Should().BeLessThan(TimeSpan.FromMilliseconds(1000));
+            time.ShouldBeGreaterThan(TimeSpan.FromMilliseconds(500));
+            time.ShouldBeLessThan(TimeSpan.FromMilliseconds(1000));
         }
 
         // Verify that times are not identical (jitter is working)
         var uniqueTimes = totalTimes.Distinct().Count();
-        uniqueTimes.Should().BeGreaterThan(1, "Jitter should cause variation in execution times");
+        uniqueTimes.ShouldBeGreaterThan(1, "Jitter should cause variation in execution times");
     }
 
     [Fact]
@@ -615,11 +619,11 @@ public class PolicyFactoryTests
         }).GetAwaiter().GetResult();
 
         // Assert
-        result.Should().Be("success");
-        attemptCount.Should().Be(3);
+        result.ShouldBe("success");
+        attemptCount.ShouldBe(3);
 
         // Default should be ExponentialWithJitter
-        _options.Resilience.Retry.BackoffStrategy.Should().Be(BackoffStrategy.ExponentialWithJitter);
+        _options.Resilience.Retry.BackoffStrategy.ShouldBe(BackoffStrategy.ExponentialWithJitter);
     }
 
     private static PostgresException CreateTransientPostgresException()

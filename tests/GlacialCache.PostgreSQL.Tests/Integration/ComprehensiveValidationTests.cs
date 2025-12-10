@@ -155,8 +155,8 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
             // Use the typed method to get the correct type
             var retrieved = await GetTypedEntry(testCase.Value.GetType(), key);
 
-            retrieved.Should().NotBeNull();
-            retrieved!.Should().BeEquivalentTo(testCase.Value);
+            retrieved.ShouldNotBeNull();
+            retrieved!.ShouldBeEquivalentTo(testCase.Value);
         }
     }
 
@@ -202,11 +202,11 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
         await _glacialCache!.SetEntryAsync(entry);
 
         var retrieved = await _glacialCache.GetEntryAsync<NestedComplexObject>("comprehensive:nested");
-        retrieved.Should().NotBeNull();
-        retrieved!.Value.Should().BeEquivalentTo(complexObject);
-        retrieved.Value.Children.Should().HaveCount(2);
-        retrieved.Value.Children[0].Children.Should().HaveCount(2);
-        retrieved.Value.Children[1].Children.Should().HaveCount(1);
+        retrieved.ShouldNotBeNull();
+        retrieved!.Value.ShouldBeEquivalentTo(complexObject);
+        retrieved.Value.Children.Length.ShouldBe(2);
+        retrieved.Value.Children[0].Children.Length.ShouldBe(2);
+        retrieved.Value.Children[1].Children.Length.ShouldBe(1);
     }
 
     [Fact]
@@ -229,20 +229,20 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
         var retrievedList = await _glacialCache.GetEntryAsync<List<string>>("comprehensive:large:list");
         var retrievedDict = await _glacialCache.GetEntryAsync<Dictionary<string, int>>("comprehensive:large:dict");
 
-        retrievedArray.Should().NotBeNull();
-        retrievedArray!.Value.Should().HaveCount(10000);
-        retrievedArray.Value[0].Should().Be(1);
-        retrievedArray.Value[9999].Should().Be(10000);
+        retrievedArray.ShouldNotBeNull();
+        retrievedArray!.Value.Length.ShouldBe(10000);
+        retrievedArray.Value[0].ShouldBe(1);
+        retrievedArray.Value[9999].ShouldBe(10000);
 
-        retrievedList.Should().NotBeNull();
-        retrievedList!.Value.Should().HaveCount(5000);
-        retrievedList.Value[0].Should().Be("Item 1");
-        retrievedList.Value[4999].Should().Be("Item 5000");
+        retrievedList.ShouldNotBeNull();
+        retrievedList!.Value.Count.ShouldBe(5000);
+        retrievedList.Value[0].ShouldBe("Item 1");
+        retrievedList.Value[4999].ShouldBe("Item 5000");
 
-        retrievedDict.Should().NotBeNull();
-        retrievedDict!.Value.Should().HaveCount(2500);
-        retrievedDict.Value["Key1"].Should().Be(2);
-        retrievedDict.Value["Key2500"].Should().Be(5000);
+        retrievedDict.ShouldNotBeNull();
+        retrievedDict!.Value.Count.ShouldBe(2500);
+        retrievedDict.Value["Key1"].ShouldBe(2);
+        retrievedDict.Value["Key2500"].ShouldBe(5000);
     }
 
     [Fact]
@@ -283,16 +283,16 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
             await _glacialCache!.SetEntryAsync(entry);
             var retrieved = await GetTypedEntry(edgeCase.Value.GetType(), key);
 
-            retrieved.Should().NotBeNull();
+            retrieved.ShouldNotBeNull();
 
             if (edgeCase.Value is double d && double.IsNaN(d))
             {
                 // For NaN values, we need to handle them specially since they can't be directly compared
-                double.IsNaN((double)retrieved!).Should().BeTrue();
+                double.IsNaN((double)retrieved!).ShouldBeTrue();
             }
             else
             {
-                retrieved!.Should().BeEquivalentTo(edgeCase.Value);
+                retrieved!.ShouldBeEquivalentTo(edgeCase.Value);
             }
         }
     }
@@ -332,11 +332,11 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
 
             if (scenario.ExpectedExpired)
             {
-                retrieved.Should().BeNull();
+                retrieved.ShouldBeNull();
             }
             else
             {
-                retrieved.Should().NotBeNull();
+                retrieved.ShouldNotBeNull();
             }
         }
     }
@@ -419,7 +419,7 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
         await _glacialCache!.SetEntryAsync(stringEntry);
 
         var intResult = await _glacialCache.GetEntryAsync<int>("error:type-mismatch");
-        intResult.Should().BeNull(); // Should handle type mismatch gracefully
+        intResult.ShouldBeNull(); // Should handle type mismatch gracefully
     }
 
     [Fact]
@@ -442,7 +442,7 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
         for (int i = 0; i < performanceTestCount; i++)
         {
             var result = await _glacialCache!.GetEntryAsync<string>($"perf:set:{i}");
-            result.Should().NotBeNull();
+            result.ShouldNotBeNull();
         }
         getStopwatch.Stop();
 
@@ -459,10 +459,10 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
         var totalTime = stopwatch.ElapsedMilliseconds;
 
         // Assert performance expectations
-        setStopwatch.ElapsedMilliseconds.Should().BeLessThan(10000); // 10 seconds for 1000 operations
-        getStopwatch.ElapsedMilliseconds.Should().BeLessThan(5000);  // 5 seconds for 1000 operations
-        batchStopwatch.ElapsedMilliseconds.Should().BeLessThan(2000); // 2 seconds for 100 operations
-        totalTime.Should().BeLessThan(15000); // Total should be reasonable
+        setStopwatch.ElapsedMilliseconds.ShouldBeLessThan(10000); // 10 seconds for 1000 operations
+        getStopwatch.ElapsedMilliseconds.ShouldBeLessThan(5000);  // 5 seconds for 1000 operations
+        batchStopwatch.ElapsedMilliseconds.ShouldBeLessThan(2000); // 2 seconds for 100 operations
+        totalTime.ShouldBeLessThan(15000); // Total should be reasonable
 
         Output.WriteLine($"Performance Results:");
         Output.WriteLine($"  Set operations: {setStopwatch.ElapsedMilliseconds}ms for {performanceTestCount} operations");
@@ -503,11 +503,11 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
             if (retrieved != null)
             {
                 verificationCount++;
-                retrieved.Value.Id.Should().Be(i);
-                retrieved.Value.Data.Should().HaveCount(1024);
+                retrieved.Value.Id.ShouldBe(i);
+                retrieved.Value.Data.Length.ShouldBe(1024);
             }
         }
-        verificationCount.Should().BeGreaterThan(90); // At least 90% should be retrievable
+        verificationCount.ShouldBeGreaterThan(90); // At least 90% should be retrievable
 
         // Force garbage collection to get accurate memory measurement
         GC.Collect();
@@ -518,7 +518,7 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
         var memoryIncrease = finalMemory - initialMemory;
 
         // Memory increase should be reasonable (less than 100MB for 1000 1KB objects)
-        memoryIncrease.Should().BeLessThan(100 * 1024 * 1024);
+        memoryIncrease.ShouldBeLessThan(100 * 1024 * 1024);
 
         // Clean up cached objects to verify proper disposal
         for (int i = 0; i < memoryTestCount; i++)
@@ -558,12 +558,12 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
         // Use traditional IDistributedCache methods
         await _distributedCache!.SetAsync(traditionalKey, traditionalValue, options);
         var traditionalResult = await _distributedCache.GetAsync(traditionalKey);
-        traditionalResult.Should().BeEquivalentTo(traditionalValue);
+        traditionalResult.ShouldBeEquivalentTo(traditionalValue);
 
         // Use new typed methods to retrieve traditional data
         var typedResult = await _glacialCache!.GetEntryAsync<string>(traditionalKey);
-        typedResult.Should().NotBeNull();
-        typedResult!.Value.Should().Be("traditional value");
+        typedResult.ShouldNotBeNull();
+        typedResult!.Value.ShouldBe("traditional value");
 
         // Use traditional methods to retrieve typed data
         var typedKey = "backward:typed";
@@ -571,8 +571,8 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
         await _glacialCache.SetEntryAsync(typedEntry);
 
         var traditionalTypedResult = await _distributedCache.GetAsync(typedKey);
-        traditionalTypedResult.Should().NotBeNull();
-        System.Text.Encoding.UTF8.GetString(traditionalTypedResult!).Should().Contain("typed value");
+        traditionalTypedResult.ShouldNotBeNull();
+        System.Text.Encoding.UTF8.GetString(traditionalTypedResult!).ShouldContain("typed value");
     }
 
     [Fact]
@@ -582,22 +582,22 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
         var nullStringEntry = CacheEntryTestHelper.Create("null:string", (string?)null);
         await _glacialCache!.SetEntryAsync(nullStringEntry);
         var nullStringResult = await _glacialCache.GetEntryAsync<string>("null:string");
-        nullStringResult.Should().NotBeNull();
-        nullStringResult!.Value.Should().Be(string.Empty);
+        nullStringResult.ShouldNotBeNull();
+        nullStringResult!.Value.ShouldBe(string.Empty);
 
         // Test default(T) values
         var defaultIntEntry = CacheEntryTestHelper.Create("default:int", default(int));
         await _glacialCache.SetEntryAsync(defaultIntEntry);
         var defaultIntResult = await _glacialCache.GetEntryAsync<int>("default:int");
-        defaultIntResult.Should().NotBeNull();
-        defaultIntResult!.Value.Should().Be(0);
+        defaultIntResult.ShouldNotBeNull();
+        defaultIntResult!.Value.ShouldBe(0);
 
         // Test empty collections
         var emptyListEntry = CacheEntryTestHelper.Create("empty:list", new List<string>());
         await _glacialCache.SetEntryAsync(emptyListEntry);
         var emptyListResult = await _glacialCache.GetEntryAsync<List<string>>("empty:list");
-        emptyListResult.Should().NotBeNull();
-        emptyListResult!.Value.Should().BeEmpty();
+        emptyListResult.ShouldNotBeNull();
+        emptyListResult!.Value.ShouldBeEmpty();
     }
 
     [Fact]
@@ -623,7 +623,7 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
         var result = await _glacialCache!.GetEntryAsync<string>(key);
 
         // Assert - Should return null due to deserialization error
-        result.Should().BeNull();
+        result.ShouldBeNull();
     }
 
     [Fact]
@@ -642,10 +642,10 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
         var retrieved = await _glacialCache.GetMultipleEntriesAsync<string>(new[] { "batch-1", "batch-2", "batch-3" });
 
         // Assert
-        retrieved.Should().HaveCount(3);
-        retrieved["batch-1"]!.Value.Should().Be("value1");
-        retrieved["batch-2"]!.Value.Should().Be("value2");
-        retrieved["batch-3"]!.Value.Should().Be("value3");
+        retrieved.Count.ShouldBe(3);
+        retrieved["batch-1"]!.Value.ShouldBe("value1");
+        retrieved["batch-2"]!.Value.ShouldBe("value2");
+        retrieved["batch-3"]!.Value.ShouldBe("value3");
     }
 
     [Fact]
@@ -660,9 +660,9 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
         await _glacialCache!.SetEntryAsync(largeEntry);
 
         var retrieved = await _glacialCache.GetEntryAsync<byte[]>("very:large:payload");
-        retrieved.Should().NotBeNull();
-        retrieved!.Value.Should().BeEquivalentTo(largeData);
-        retrieved.Value.Should().HaveCount(largeSize);
+        retrieved.ShouldNotBeNull();
+        retrieved!.Value.ShouldBeEquivalentTo(largeData);
+        retrieved.Value.Length.ShouldBe(largeSize);
     }
 
     private static CacheEntry<T> CreateTypedEntry<T>(string key, T value) => CacheEntryTestHelper.Create(key, value);

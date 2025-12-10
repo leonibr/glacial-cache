@@ -50,28 +50,28 @@ public sealed class TimeConverterServiceTests
     public void Constructor_WithValidParameters_CreatesService()
     {
         var service = new TimeConverterService(_mockLogger.Object, _mockTimeProvider.Object, _mockOptions.Object);
-        service.Should().NotBeNull();
+        service.ShouldNotBeNull();
     }
 
     [Fact]
     public void Constructor_WithNullLogger_ThrowsArgumentNullException()
     {
         var act = () => new TimeConverterService(null!, _mockTimeProvider.Object, _mockOptions.Object);
-        act.Should().Throw<ArgumentNullException>().WithParameterName("logger");
+        act.ShouldThrow<ArgumentNullException>().ParamName.ShouldBe("logger");
     }
 
     [Fact]
     public void Constructor_WithNullTimeProvider_ThrowsArgumentNullException()
     {
         var act = () => new TimeConverterService(_mockLogger.Object, null!, _mockOptions.Object);
-        act.Should().Throw<ArgumentNullException>().WithParameterName("timeProvider");
+        act.ShouldThrow<ArgumentNullException>().ParamName.ShouldBe("timeProvider");
     }
 
     [Fact]
     public void Constructor_WithNullOptions_ThrowsArgumentNullException()
     {
         var act = () => new TimeConverterService(_mockLogger.Object, _mockTimeProvider.Object, null!);
-        act.Should().Throw<ArgumentNullException>().WithParameterName("options");
+        act.ShouldThrow<ArgumentNullException>().ParamName.ShouldBe("options");
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -82,7 +82,7 @@ public sealed class TimeConverterServiceTests
     public void ConvertToRelativeInterval_WithNullAbsoluteExpiration_ReturnsNull()
     {
         var result = _service.ConvertToRelativeInterval(null);
-        result.Should().BeNull();
+        result.ShouldBeNull();
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -103,7 +103,7 @@ public sealed class TimeConverterServiceTests
         var result = _service.ConvertToRelativeInterval(absoluteExpiration);
 
         // Assert
-        result.Should().Be(expectedRelativeInterval);
+        result.ShouldBe(expectedRelativeInterval);
     }
 
 
@@ -123,7 +123,7 @@ public sealed class TimeConverterServiceTests
         var result = _service.ConvertToRelativeInterval(absoluteExpiration);
 
         // Assert
-        result.Should().Be(expectedRelativeInterval);
+        result.ShouldBe(expectedRelativeInterval);
     }
 
     #endregion
@@ -144,7 +144,7 @@ public sealed class TimeConverterServiceTests
         var result = _service.ConvertToRelativeInterval(absoluteExpiration);
 
         // Assert
-        result.Should().Be(expectedRelativeInterval);
+        result.ShouldBe(expectedRelativeInterval);
     }
 
     [Fact]
@@ -160,7 +160,7 @@ public sealed class TimeConverterServiceTests
         var result = _service.ConvertToRelativeInterval(absoluteExpiration);
 
         // Assert - should handle zero or negative intervals as immediate expiration
-        result.Should().Be(TimeSpan.FromMilliseconds(1));
+        result.ShouldBe(TimeSpan.FromMilliseconds(1));
     }
 
     #endregion
@@ -181,7 +181,7 @@ public sealed class TimeConverterServiceTests
         var result = _service.ConvertToRelativeInterval(absoluteExpiration);
 
         // Assert
-        result.Should().Be(expectedRelativeInterval);
+        result.ShouldBe(expectedRelativeInterval);
     }
 
     #endregion
@@ -201,7 +201,7 @@ public sealed class TimeConverterServiceTests
         var result = _service.ConvertToRelativeInterval(absoluteExpiration);
 
         // Assert - Verify the service correctly uses the FakeTimeProvider time
-        result.Should().Be(TimeSpan.FromHours(1));
+        result.ShouldBe(TimeSpan.FromHours(1));
     }
 
     #endregion
@@ -222,7 +222,7 @@ public sealed class TimeConverterServiceTests
         var result = _service.ConvertToRelativeInterval(absoluteExpiration);
 
         // Assert
-        result.Should().Be(expectedMinimum);
+        result.ShouldBe(expectedMinimum);
     }
 
 
@@ -244,7 +244,7 @@ public sealed class TimeConverterServiceTests
         var result = _service.ConvertToRelativeInterval(absoluteExpiration);
 
         // Assert
-        result.Should().Be(expectedMaximum);
+        result.ShouldBe(expectedMaximum);
     }
 
 
@@ -281,7 +281,7 @@ public sealed class TimeConverterServiceTests
         var result = customService.ConvertToRelativeInterval(absoluteExpiration);
 
         // Assert
-        result.Should().Be(customMinimum);
+        result.ShouldBe(customMinimum);
     }
 
 

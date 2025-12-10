@@ -104,7 +104,7 @@ public class CleanupBackgroundServiceIntegrationTests : IntegrationTestBase
     {
         // Arrange - Set entries with very short expiration
         _timeHelper?.SetTime(_timeHelper.InitialTime);
-        _cache.Should().NotBeNull();
+        _cache.ShouldNotBeNull();
         await _cache.SetStringAsync("expired-key-1", "value1", new DistributedCacheEntryOptions
         {
             AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(2)
@@ -125,12 +125,12 @@ public class CleanupBackgroundServiceIntegrationTests : IntegrationTestBase
         var value2 = await _cache.GetStringAsync("expired-key-2");
         var validValue = await _cache.GetStringAsync("valid-key");
 
-        value1.Should().Be("value1");
-        value2.Should().Be("value2");
-        validValue.Should().Be("valid-value");
+        value1.ShouldBe("value1");
+        value2.ShouldBe("value2");
+        validValue.ShouldBe("valid-value");
 
         // Act - Wait for expiration and cleanup
-        _timeHelper.Should().NotBeNull();
+        _timeHelper.ShouldNotBeNull();
         _timeHelper!.Advance(TimeSpan.FromMinutes(3)); // Wait for entries to expire
 
         // Service already started in Initialize; ensure at least one cycle
@@ -145,31 +145,31 @@ public class CleanupBackgroundServiceIntegrationTests : IntegrationTestBase
         var expiredValue2 = await _cache.GetStringAsync("expired-key-2");
         var stillValidValue = await _cache.GetStringAsync("valid-key");
 
-        expiredValue1.Should().BeNull();
-        expiredValue2.Should().BeNull();
-        stillValidValue.Should().Be("valid-value");
+        expiredValue1.ShouldBeNull();
+        expiredValue2.ShouldBeNull();
+        stillValidValue.ShouldBe("valid-value");
     }
 
     [Fact]
     public async Task CleanupBackgroundService_WhenManagerElectionEnabled_ManagerInstanceShouldCleanup()
     {
         // Arrange
-        _serviceProvider.Should().NotBeNull();
+        _serviceProvider.ShouldNotBeNull();
         var managerElectionService = _serviceProvider.GetRequiredService<IManagerElectionService>();
 
         // Verify manager election is enabled
         var options = _serviceProvider.GetRequiredService<IOptions<GlacialCachePostgreSQLOptions>>();
-        options.Value.Infrastructure.EnableManagerElection.Should().BeTrue();
+        options.Value.Infrastructure.EnableManagerElection.ShouldBeTrue();
 
         // Set an expired entry
-        _cache.Should().NotBeNull();
+        _cache.ShouldNotBeNull();
         await _cache.SetStringAsync("manager-test-key", "test-value", new DistributedCacheEntryOptions
         {
             AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(1)
         });
 
         // Act - Wait for expiration and cleanup
-        _timeHelper.Should().NotBeNull();
+        _timeHelper.ShouldNotBeNull();
         _timeHelper!.Advance(TimeSpan.FromMinutes(2));
 
         // Service already started in Initialize (manager election may flip)
@@ -213,7 +213,7 @@ public class CleanupBackgroundServiceIntegrationTests : IntegrationTestBase
     public async Task CleanupBackgroundService_WhenManagerElectionDisabled_AllInstancesShouldCleanup()
     {
         // Ensure test is properly initialized
-        _postgres.Should().NotBeNull();
+        _postgres.ShouldNotBeNull();
 
         // Arrange - Create a new service provider with manager election disabled
         var services = new ServiceCollection();
@@ -240,7 +240,7 @@ public class CleanupBackgroundServiceIntegrationTests : IntegrationTestBase
         var testCleanupService = testProvider.GetRequiredService<CleanupBackgroundService>();
 
         // Set an expired entry
-        testCache.Should().NotBeNull();
+        testCache.ShouldNotBeNull();
         await testCache.SetStringAsync("no-manager-test-key", "test-value", new DistributedCacheEntryOptions
         {
             AbsoluteExpirationRelativeToNow = TimeSpan.FromMilliseconds(100)
@@ -250,14 +250,14 @@ public class CleanupBackgroundServiceIntegrationTests : IntegrationTestBase
         _timeHelper.Advance(TimeSpan.FromMilliseconds(200));
 
         // Start the cleanup service (no manager election check)
-        testCleanupService.Should().NotBeNull();
+        testCleanupService.ShouldNotBeNull();
         await testCleanupService.StartAsync(default);
         _timeHelper.Advance(TimeSpan.FromMilliseconds(1000)); // Wait for cleanup cycle
         await testCleanupService.StopAsync(default);
 
         // Assert - Entry should be cleaned up regardless of manager election
         var result = await testCache.GetStringAsync("no-manager-test-key");
-        result.Should().BeNull("Cleanup should run when manager election is disabled");
+        result.ShouldBeNull("Cleanup should run when manager election is disabled");
 
         // Cleanup
         await testCleanupService.StopAsync(default);
@@ -269,7 +269,7 @@ public class CleanupBackgroundServiceIntegrationTests : IntegrationTestBase
     public async Task CleanupBackgroundService_ConfigurableCleanupInterval_WorksCorrectly()
     {
         // Ensure test is properly initialized
-        _postgres.Should().NotBeNull();
+        _postgres.ShouldNotBeNull();
 
         // Arrange - Create service with custom interval
         var services = new ServiceCollection();
@@ -294,7 +294,7 @@ public class CleanupBackgroundServiceIntegrationTests : IntegrationTestBase
         var testCleanupService = testProvider.GetRequiredService<CleanupBackgroundService>();
 
         // Set multiple expired entries
-        testCache.Should().NotBeNull();
+        testCache.ShouldNotBeNull();
         for (int i = 0; i < 5; i++)
         {
             await testCache.SetStringAsync($"interval-test-key-{i}", $"value-{i}", new DistributedCacheEntryOptions
@@ -307,7 +307,7 @@ public class CleanupBackgroundServiceIntegrationTests : IntegrationTestBase
         _timeHelper.Advance(TimeSpan.FromMilliseconds(100));
 
         // Start cleanup service
-        testCleanupService.Should().NotBeNull();
+        testCleanupService.ShouldNotBeNull();
         await testCleanupService.StartAsync(default);
 
         // Wait for multiple cleanup cycles (200ms interval)
@@ -319,7 +319,7 @@ public class CleanupBackgroundServiceIntegrationTests : IntegrationTestBase
         for (int i = 0; i < 5; i++)
         {
             var result = await testCache.GetStringAsync($"interval-test-key-{i}");
-            result.Should().BeNull($"Entry {i} should be cleaned up");
+            result.ShouldBeNull($"Entry {i} should be cleaned up");
         }
 
         // Cleanup
@@ -330,7 +330,7 @@ public class CleanupBackgroundServiceIntegrationTests : IntegrationTestBase
     public async Task CleanupBackgroundService_BatchSizeLimit_WorksCorrectly()
     {
         // Ensure test is properly initialized
-        _postgres.Should().NotBeNull();
+        _postgres.ShouldNotBeNull();
 
         // Arrange - Create service with small batch size
         var services = new ServiceCollection();
@@ -355,7 +355,7 @@ public class CleanupBackgroundServiceIntegrationTests : IntegrationTestBase
         var testCleanupService = testProvider.GetRequiredService<CleanupBackgroundService>();
 
         // Set many expired entries
-        testCache.Should().NotBeNull();
+        testCache.ShouldNotBeNull();
         for (int i = 0; i < 10; i++)
         {
             await testCache.SetStringAsync($"batch-test-key-{i}", $"value-{i}", new DistributedCacheEntryOptions
@@ -367,7 +367,7 @@ public class CleanupBackgroundServiceIntegrationTests : IntegrationTestBase
         // Act - Wait for expiration and cleanup
         _timeHelper.Advance(TimeSpan.FromMilliseconds(100));
 
-        testCleanupService.Should().NotBeNull();
+        testCleanupService.ShouldNotBeNull();
         await testCleanupService.StartAsync(default);
         _timeHelper.Advance(TimeSpan.FromMilliseconds(2000)); // Allow multiple cleanup cycles to process all entries
         await testCleanupService.StopAsync(default);
@@ -376,7 +376,7 @@ public class CleanupBackgroundServiceIntegrationTests : IntegrationTestBase
         for (int i = 0; i < 10; i++)
         {
             var result = await testCache.GetStringAsync($"batch-test-key-{i}");
-            result.Should().BeNull($"Entry {i} should be cleaned up eventually");
+            result.ShouldBeNull($"Entry {i} should be cleaned up eventually");
         }
 
         // Cleanup

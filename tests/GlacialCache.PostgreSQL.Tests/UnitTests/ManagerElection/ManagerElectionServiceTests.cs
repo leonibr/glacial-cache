@@ -52,7 +52,7 @@ public class ManagerElectionServiceTests
     public void IsManager_ShouldReturnFalse_WhenNotElected()
     {
         // Act & Assert
-        _service.IsManager.Should().BeFalse();
+        _service.IsManager.ShouldBeFalse();
     }
 
     [Fact]
@@ -66,8 +66,8 @@ public class ManagerElectionServiceTests
         var result = await _service.TryAcquireManagerRoleAsync();
 
         // Assert
-        result.Should().BeFalse();
-        _service.IsManager.Should().BeFalse();
+        result.ShouldBeFalse();
+        _service.IsManager.ShouldBeFalse();
     }
 
     [Fact]
@@ -139,8 +139,8 @@ public class ManagerElectionServiceTests
         var result = await _service.TryAcquireManagerRoleAsync();
 
         // Assert
-        result.Should().BeFalse();
-        _service.IsManager.Should().BeFalse();
+        result.ShouldBeFalse();
+        _service.IsManager.ShouldBeFalse();
 
         // Verify that the specific error message was logged
         _mockLogger.Verify(x => x.Log(
@@ -194,8 +194,8 @@ public class ManagerElectionServiceTests
         var result = await _service.TryAcquireManagerRoleAsync();
 
         // Assert
-        result.Should().BeFalse();
-        _service.IsManager.Should().BeFalse();
+        result.ShouldBeFalse();
+        _service.IsManager.ShouldBeFalse();
 
         // Verify that a warning was logged (not error)
         _mockLogger.Verify(x => x.Log(
@@ -231,8 +231,8 @@ public class ManagerElectionServiceTests
         var result = await _service.TryAcquireManagerRoleAsync();
 
         // Assert
-        result.Should().BeFalse();
-        _service.IsManager.Should().BeFalse();
+        result.ShouldBeFalse();
+        _service.IsManager.ShouldBeFalse();
 
         // Verify that a warning was logged (not error)
         _mockLogger.Verify(x => x.Log(

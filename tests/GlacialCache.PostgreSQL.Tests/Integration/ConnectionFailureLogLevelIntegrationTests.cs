@@ -250,7 +250,7 @@ public class ConnectionFailureLogLevelIntegrationTests : IntegrationTestBase
         var result = await _cache!.GetStringAsync("success-test-key");
 
         // Assert - Verify successful operation and no connection failure logging
-        result.Should().Be("success-test-value");
+        result.ShouldBe("success-test-value");
 
         // Verify no connection failure logging occurred
         _loggerMock!.Verify(x => x.Log(It.IsAny<LogLevel>(),

@@ -123,7 +123,7 @@ public class SecurityFeaturesIntegrationTests : IntegrationTestBase
         });
 
         // Assert - Cache should be created successfully with security options
-        cache.Should().NotBeNull();
+        cache.ShouldNotBeNull();
 
         // Verify basic functionality still works
         await cache.SetEntryAsync("security-test-key", "security-test-value", new DistributedCacheEntryOptions
@@ -132,8 +132,8 @@ public class SecurityFeaturesIntegrationTests : IntegrationTestBase
         });
 
         var retrievedEntry = await cache.GetEntryAsync<string>("security-test-key");
-        retrievedEntry.Should().NotBeNull();
-        retrievedEntry.Value.Should().Be("security-test-value");
+        retrievedEntry.ShouldNotBeNull();
+        retrievedEntry.Value.ShouldBe("security-test-value");
     }
 
     [Fact]
@@ -146,7 +146,7 @@ public class SecurityFeaturesIntegrationTests : IntegrationTestBase
         });
 
         // Assert - Cache should work with default values
-        cache.Should().NotBeNull();
+        cache.ShouldNotBeNull();
 
         // Verify basic functionality
         await cache.SetEntryAsync("default-security-test", "value", new DistributedCacheEntryOptions
@@ -155,8 +155,8 @@ public class SecurityFeaturesIntegrationTests : IntegrationTestBase
         });
 
         var result = await cache.GetEntryAsync<string>("default-security-test");
-        result.Should().NotBeNull();
-        result.Value.Should().Be("value");
+        result.ShouldNotBeNull();
+        result.Value.ShouldBe("value");
     }
 
     [Fact]
@@ -169,7 +169,7 @@ public class SecurityFeaturesIntegrationTests : IntegrationTestBase
         });
 
         // Assert - Cache should work with audit disabled
-        cache.Should().NotBeNull();
+        cache.ShouldNotBeNull();
 
         // Perform operations that would generate audit logs if enabled
         await cache.SetEntryAsync("audit-test-1", "value1");
@@ -179,10 +179,10 @@ public class SecurityFeaturesIntegrationTests : IntegrationTestBase
         await cache.RemoveAsync("audit-test-1");
 
         // Verify operations completed successfully
-        entry1.Should().NotBeNull();
-        entry1.Value.Should().Be("value1");
-        entry2.Should().NotBeNull();
-        entry2.Value.Should().Be("value2");
+        entry1.ShouldNotBeNull();
+        entry1.Value.ShouldBe("value1");
+        entry2.ShouldNotBeNull();
+        entry2.Value.ShouldBe("value2");
 
         // Verify no audit logs were created (since feature is not implemented yet)
         // This test documents expected behavior when audit logging is implemented
@@ -202,7 +202,7 @@ public class SecurityFeaturesIntegrationTests : IntegrationTestBase
             });
 
             // Assert - Configuration should be accepted
-            cache.Should().NotBeNull();
+            cache.ShouldNotBeNull();
 
             // Verify basic functionality still works regardless of encryption setting
             var testKey = $"encryption-test-{encryptInMemory}";
@@ -212,8 +212,8 @@ public class SecurityFeaturesIntegrationTests : IntegrationTestBase
             });
 
             var retrieved = await cache.GetEntryAsync<string>(testKey);
-            retrieved.Should().NotBeNull();
-            retrieved.Value.Should().Be("test-value");
+            retrieved.ShouldNotBeNull();
+            retrieved.Value.ShouldBe("test-value");
         }
     }
 
@@ -237,7 +237,7 @@ public class SecurityFeaturesIntegrationTests : IntegrationTestBase
             });
 
             // Assert - Configuration should be accepted
-            cache.Should().NotBeNull();
+            cache.ShouldNotBeNull();
 
             // Verify basic functionality
             var testKey = $"buffer-test-{buffer.TotalMinutes}";
@@ -247,8 +247,8 @@ public class SecurityFeaturesIntegrationTests : IntegrationTestBase
             });
 
             var retrieved = await cache.GetEntryAsync<string>(testKey);
-            retrieved.Should().NotBeNull();
-            retrieved.Value.Should().Be("buffer-test-value");
+            retrieved.ShouldNotBeNull();
+            retrieved.Value.ShouldBe("buffer-test-value");
         }
     }
 
@@ -273,7 +273,7 @@ public class SecurityFeaturesIntegrationTests : IntegrationTestBase
             });
 
             // Assert - All configurations should be accepted
-            cache.Should().NotBeNull();
+            cache.ShouldNotBeNull();
 
             // Perform operations that would be audited
             var testKey = $"audit-config-test-{enableAudit}-{logPatterns}";
@@ -283,8 +283,8 @@ public class SecurityFeaturesIntegrationTests : IntegrationTestBase
             });
 
             var retrieved = await cache.GetEntryAsync<string>(testKey);
-            retrieved.Should().NotBeNull();
-            retrieved.Value.Should().Be("audit-test-value");
+            retrieved.ShouldNotBeNull();
+            retrieved.Value.ShouldBe("audit-test-value");
         }
     }
 
@@ -306,7 +306,7 @@ public class SecurityFeaturesIntegrationTests : IntegrationTestBase
         });
 
         // Assert - Combined configuration should work
-        cache.Should().NotBeNull();
+        cache.ShouldNotBeNull();
 
         // Perform comprehensive test operations
         var operations = new[]
@@ -328,8 +328,8 @@ public class SecurityFeaturesIntegrationTests : IntegrationTestBase
         foreach (var (key, expectedValue) in operations)
         {
             var retrieved = await cache.GetEntryAsync<string>(key);
-            retrieved.Should().NotBeNull();
-            retrieved.Value.Should().Be(expectedValue);
+            retrieved.ShouldNotBeNull();
+            retrieved.Value.ShouldBe(expectedValue);
         }
 
         // Clean up
@@ -363,15 +363,15 @@ public class SecurityFeaturesIntegrationTests : IntegrationTestBase
             });
 
             var retrieved = await cache.GetEntryAsync<string>(key);
-            retrieved.Should().NotBeNull();
-            retrieved.Value.Should().Be(value);
+            retrieved.ShouldNotBeNull();
+            retrieved.Value.ShouldBe(value);
 
             // Immediate cleanup to avoid conflicts
             await cache.RemoveAsync(key);
         }
 
         // Assert - All operations completed successfully with configuration intact
-        cache.Should().NotBeNull();
+        cache.ShouldNotBeNull();
     }
 
     /// <summary>
@@ -396,8 +396,8 @@ public class SecurityFeaturesIntegrationTests : IntegrationTestBase
         });
 
         var retrieved = await cache.GetEntryAsync<string>("token-encryption-test");
-        retrieved.Should().NotBeNull();
-        retrieved.Value.Should().Be("sensitive-token-data");
+        retrieved.ShouldNotBeNull();
+        retrieved.Value.ShouldBe("sensitive-token-data");
 
         // TODO: When implemented, add assertions to verify encryption in memory
         // - Verify tokens are encrypted when stored in memory
@@ -427,7 +427,7 @@ public class SecurityFeaturesIntegrationTests : IntegrationTestBase
         });
 
         var retrieved = await cache.GetEntryAsync<string>("audit-test-key");
-        retrieved.Should().NotBeNull();
+        retrieved.ShouldNotBeNull();
 
         await cache.RemoveAsync("audit-test-key");
 

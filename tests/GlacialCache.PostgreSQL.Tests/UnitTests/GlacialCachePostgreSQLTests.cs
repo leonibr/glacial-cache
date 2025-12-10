@@ -95,7 +95,7 @@ public class GlacialCachePostgreSQLTests
         var result = await cache.GetStringAsync("test-key");
 
         // Assert - Result should be null or empty string (depending on implementation)
-        result.Should().BeNullOrEmpty();
+        result.ShouldBeNullOrEmpty();
 
         // Verify the logger was called with the correct log level using ILogger.Log
         _logger.Verify(

@@ -52,7 +52,7 @@ public sealed class DynamicTableSchemaChangeIntegrationTest : IntegrationTestBas
 
             services.AddGlacialCachePostgreSQL(options =>
             {
-                options.Connection.ConnectionString = _postgres.GetConnectionString();
+                options.Connection.ConnectionString = new NpgsqlConnectionStringBuilder(_postgres.GetConnectionString()) { ApplicationName = GetType().Name }.ConnectionString;
                 options.Cache.SchemaName = "test_schema_1";
                 options.Cache.TableName = "test_table_1";
                 options.Infrastructure.EnableManagerElection = false;

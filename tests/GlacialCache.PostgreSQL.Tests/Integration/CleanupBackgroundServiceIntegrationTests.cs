@@ -9,6 +9,7 @@ using GlacialCache.PostgreSQL.Services;
 using GlacialCache.PostgreSQL.Configuration;
 using GlacialCache.PostgreSQL.Abstractions;
 using Xunit.Abstractions;
+using Npgsql;
 
 namespace GlacialCache.PostgreSQL.Tests.Integration;
 
@@ -16,9 +17,9 @@ public class CleanupBackgroundServiceIntegrationTests : IntegrationTestBase
 {
     private PostgreSqlContainer? _postgres;
     private ServiceProvider? _serviceProvider;
-    private CleanupBackgroundService? _cleanupService;
     private IDistributedCache? _cache;
     private TimeTestHelper? _timeHelper;
+    private ILoggerFactory? _loggerFactory;
 
     public CleanupBackgroundServiceIntegrationTests(ITestOutputHelper output) : base(output)
     {
@@ -47,6 +48,7 @@ public class CleanupBackgroundServiceIntegrationTests : IntegrationTestBase
             var services = new ServiceCollection();
             services.AddLogging(builder =>
                 builder.AddConsole()
+                       .AddSimpleConsole(options => options.IncludeScopes = true)
                        .SetMinimumLevel(LogLevel.Debug)
                        .AddFilter("GlacialCache.PostgreSQL.Services.CleanupBackgroundService", LogLevel.Trace));
 
@@ -56,7 +58,7 @@ public class CleanupBackgroundServiceIntegrationTests : IntegrationTestBase
             // Configure the cache with simplified options
             services.AddGlacialCachePostgreSQL(options =>
             {
-                options.Connection.ConnectionString = _postgres.GetConnectionString();
+                options.Connection.ConnectionString = new NpgsqlConnectionStringBuilder(_postgres.GetConnectionString()) { ApplicationName = GetType().Name }.ConnectionString;
                 options.Cache.SchemaName = "public";
                 options.Cache.TableName = "test_cache";
 
@@ -68,10 +70,8 @@ public class CleanupBackgroundServiceIntegrationTests : IntegrationTestBase
             });
 
             _serviceProvider = services.BuildServiceProvider();
+            _loggerFactory = _serviceProvider.GetRequiredService<ILoggerFactory>();
             _cache = _serviceProvider.GetRequiredService<IDistributedCache>();
-            _cleanupService = _serviceProvider.GetRequiredService<CleanupBackgroundService>();
-            // Ensure cleanup service is started for tests relying on it
-            await _cleanupService.StartAsync(default);
         }
         catch (Exception ex)
         {
@@ -82,12 +82,6 @@ public class CleanupBackgroundServiceIntegrationTests : IntegrationTestBase
 
     protected override async Task CleanupTestAsync()
     {
-        if (_cleanupService != null)
-        {
-            await _cleanupService.StopAsync(default);
-            _cleanupService.Dispose();
-        }
-
         if (_serviceProvider is IDisposable disposable)
         {
             disposable.Dispose();
@@ -219,6 +213,7 @@ public class CleanupBackgroundServiceIntegrationTests : IntegrationTestBase
         var services = new ServiceCollection();
         services.AddLogging(builder =>
             builder.AddConsole()
+                   .AddSimpleConsole(options => options.IncludeScopes = true)
                    .SetMinimumLevel(LogLevel.Debug));
 
         // Use the same time helper for consistency
@@ -226,7 +221,7 @@ public class CleanupBackgroundServiceIntegrationTests : IntegrationTestBase
 
         services.AddGlacialCachePostgreSQL(options =>
         {
-            options.Connection.ConnectionString = _postgres.GetConnectionString();
+            options.Connection.ConnectionString = new NpgsqlConnectionStringBuilder(_postgres.GetConnectionString()) { ApplicationName = GetType().Name }.ConnectionString;
             options.Cache.SchemaName = "public";
             options.Cache.TableName = "test_cache_no_manager";
             options.Maintenance.EnableAutomaticCleanup = true;
@@ -273,14 +268,17 @@ public class CleanupBackgroundServiceIntegrationTests : IntegrationTestBase
 
         // Arrange - Create service with custom interval
         var services = new ServiceCollection();
-        services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Debug));
+        services.AddLogging(builder =>
+            builder.AddConsole()
+                   .AddSimpleConsole(options => options.IncludeScopes = true)
+                   .SetMinimumLevel(LogLevel.Debug));
 
         // Use the same time helper for consistency
         services.AddSingleton<TimeProvider>(_timeHelper!.TimeProvider);
 
         services.AddGlacialCachePostgreSQL(options =>
         {
-            options.Connection.ConnectionString = _postgres.GetConnectionString();
+            options.Connection.ConnectionString = new NpgsqlConnectionStringBuilder(_postgres.GetConnectionString()) { ApplicationName = GetType().Name }.ConnectionString;
             options.Cache.SchemaName = "public";
             options.Cache.TableName = "test_cache_interval";
             options.Maintenance.EnableAutomaticCleanup = true;
@@ -334,14 +332,17 @@ public class CleanupBackgroundServiceIntegrationTests : IntegrationTestBase
 
         // Arrange - Create service with small batch size
         var services = new ServiceCollection();
-        services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Debug));
+        services.AddLogging(builder =>
+            builder.AddConsole()
+                   .AddSimpleConsole(options => options.IncludeScopes = true)
+                   .SetMinimumLevel(LogLevel.Debug));
 
         // Use the same time helper for consistency
         services.AddSingleton<TimeProvider>(_timeHelper!.TimeProvider);
 
         services.AddGlacialCachePostgreSQL(options =>
         {
-            options.Connection.ConnectionString = _postgres.GetConnectionString();
+            options.Connection.ConnectionString = new NpgsqlConnectionStringBuilder(_postgres.GetConnectionString()) { ApplicationName = GetType().Name }.ConnectionString;
             options.Cache.SchemaName = "public";
             options.Cache.TableName = "test_cache_batch";
             options.Maintenance.EnableAutomaticCleanup = true;

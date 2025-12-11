@@ -11,6 +11,7 @@ using GlacialCache.PostgreSQL.Services;
 using GlacialCache.PostgreSQL.Serializers;
 using Xunit.Abstractions;
 using System.Diagnostics;
+using Npgsql;
 
 namespace GlacialCache.PostgreSQL.Tests.Integration;
 
@@ -23,7 +24,6 @@ public class SerializerIntegrationTests : IntegrationTestBase
 {
     private PostgreSqlContainer? _postgres;
     private IServiceProvider? _serviceProvider;
-    private CleanupBackgroundService? _cleanupService;
 
     public SerializerIntegrationTests(ITestOutputHelper output) : base(output)
     {
@@ -56,7 +56,6 @@ public class SerializerIntegrationTests : IntegrationTestBase
         {
             try
             {
-                await (_cleanupService?.StopAsync(default) ?? Task.CompletedTask);
                 disposable.Dispose();
             }
             catch (Exception ex)
@@ -94,10 +93,10 @@ public class SerializerIntegrationTests : IntegrationTestBase
 
         services.AddGlacialCachePostgreSQL(options =>
         {
-            options.Connection.ConnectionString = _postgres!.GetConnectionString();
+            options.Connection.ConnectionString = new NpgsqlConnectionStringBuilder(_postgres!.GetConnectionString()) { ApplicationName = GetType().Name }.ConnectionString;
             options.Infrastructure.EnableManagerElection = false;
             options.Infrastructure.CreateInfrastructure = true;
-            options.Maintenance.EnableAutomaticCleanup = true;
+            options.Maintenance.EnableAutomaticCleanup = false;
             options.Maintenance.CleanupInterval = TimeSpan.FromMilliseconds(250);
 
             // Configure serializer
@@ -107,8 +106,6 @@ public class SerializerIntegrationTests : IntegrationTestBase
         _serviceProvider = services.BuildServiceProvider();
         var cache = _serviceProvider.GetRequiredService<IGlacialCache>();
         var serializer = _serviceProvider.GetRequiredService<ICacheEntrySerializer>();
-        _cleanupService = _serviceProvider.GetRequiredService<CleanupBackgroundService>();
-        await _cleanupService.StartAsync(default);
 
         return (cache, serializer);
     }
@@ -252,37 +249,51 @@ public class SerializerIntegrationTests : IntegrationTestBase
         // Arrange - Test data that will show performance differences
         var testObject = CreateLargeTestObject();
         var iterations = 10;
+        var runsPerSerializer = 3; // Run each serializer 3 times to eliminate cold start effects
 
         var results = new Dictionary<string, TimeSpan>();
 
         foreach (var serializerType in new[] { SerializerType.MemoryPack, SerializerType.JsonBytes })
         {
-            var (cache, _) = await SetupCacheAsync(options =>
-            {
-                options.Cache.Serializer = serializerType;
-            });
+            var timings = new List<TimeSpan>();
 
-            var stopwatch = Stopwatch.StartNew();
-
-            // Perform multiple set/get operations
-            for (int i = 0; i < iterations; i++)
+            // Run multiple times and collect timings
+            for (int run = 0; run < runsPerSerializer; run++)
             {
-                var key = $"perf-test-{serializerType}-{i}";
-                await cache.SetEntryAsync(key, testObject, new DistributedCacheEntryOptions
+                var (cache, _) = await SetupCacheAsync(options =>
                 {
-                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(1)
+                    options.Cache.Serializer = serializerType;
                 });
 
-                var retrievedEntry = await cache.GetEntryAsync<TestDataObject>(key);
-                retrievedEntry.ShouldNotBeNull();
+                var stopwatch = Stopwatch.StartNew();
+
+                // Perform multiple set/get operations
+                for (int i = 0; i < iterations; i++)
+                {
+                    var key = $"perf-test-{serializerType}-{run}-{i}";
+                    await cache.SetEntryAsync(key, testObject, new DistributedCacheEntryOptions
+                    {
+                        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(1)
+                    });
+
+                    var retrievedEntry = await cache.GetEntryAsync<TestDataObject>(key);
+                    retrievedEntry.ShouldNotBeNull();
+                }
+
+                stopwatch.Stop();
+                var elapsed = stopwatch.Elapsed.TotalMilliseconds > 0 ? stopwatch.Elapsed : TimeSpan.FromTicks(1);
+                timings.Add(elapsed);
             }
 
-            stopwatch.Stop();
-            results[serializerType.ToString()] = stopwatch.Elapsed.TotalMilliseconds > 0 ? stopwatch.Elapsed : TimeSpan.FromTicks(1);
+            // Use the minimum time to eliminate cold start effects
+            results[serializerType.ToString()] = timings.Min();
         }
 
         // Assert - MemoryPack should generally be faster than JSON
         // (Allow some tolerance for test environment variations)
+        Output.WriteLine($"MemoryPack (min of {runsPerSerializer} runs): {results[SerializerType.MemoryPack.ToString()]}");
+        Output.WriteLine($"JsonBytes (min of {runsPerSerializer} runs): {results[SerializerType.JsonBytes.ToString()]}");
+        Output.WriteLine($"MemoryPack / JsonBytes: {results[SerializerType.MemoryPack.ToString()] / results[SerializerType.JsonBytes.ToString()]}");
         results[SerializerType.MemoryPack.ToString()].ShouldBeLessThan(
             results[SerializerType.JsonBytes.ToString()] * 1.5); // Allow 50% tolerance
     }

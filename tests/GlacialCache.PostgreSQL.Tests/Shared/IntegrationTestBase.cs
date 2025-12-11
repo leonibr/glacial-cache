@@ -1,4 +1,5 @@
 using Xunit.Abstractions;
+using Npgsql;
 
 namespace GlacialCache.PostgreSQL.Tests.Shared;
 
@@ -13,7 +14,6 @@ public abstract class IntegrationTestBase : IAsyncLifetime
     {
         Output = output;
     }
-
 
     /// <summary>
     /// Initializes the test environment

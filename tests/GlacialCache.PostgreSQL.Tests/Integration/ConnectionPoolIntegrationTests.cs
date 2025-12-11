@@ -9,6 +9,7 @@ using GlacialCache.PostgreSQL.Configuration;
 using GlacialCache.PostgreSQL.Services;
 using GlacialCache.PostgreSQL.Models;
 using Xunit.Abstractions;
+using Npgsql;
 
 namespace GlacialCache.PostgreSQL.Tests.Integration;
 
@@ -22,7 +23,6 @@ public class ConnectionPoolIntegrationTests : IntegrationTestBase
     private PostgreSqlContainer? _postgres;
     private IDistributedCache? _cache;
     private IServiceProvider? _serviceProvider;
-    private CleanupBackgroundService? _cleanupService;
 
     public ConnectionPoolIntegrationTests(ITestOutputHelper output) : base(output)
     {
@@ -55,7 +55,6 @@ public class ConnectionPoolIntegrationTests : IntegrationTestBase
         {
             try
             {
-                await (_cleanupService?.StopAsync(default) ?? Task.CompletedTask);
                 disposable.Dispose();
             }
             catch (Exception ex)
@@ -93,10 +92,10 @@ public class ConnectionPoolIntegrationTests : IntegrationTestBase
 
         services.AddGlacialCachePostgreSQL(options =>
         {
-            options.Connection.ConnectionString = _postgres!.GetConnectionString();
+            options.Connection.ConnectionString = new NpgsqlConnectionStringBuilder(_postgres!.GetConnectionString()) { ApplicationName = GetType().Name }.ConnectionString;
             options.Infrastructure.EnableManagerElection = false;
             options.Infrastructure.CreateInfrastructure = true;
-            options.Maintenance.EnableAutomaticCleanup = true;
+            options.Maintenance.EnableAutomaticCleanup = false;
             options.Maintenance.CleanupInterval = TimeSpan.FromMilliseconds(250);
 
             // Configure connection pool settings
@@ -105,8 +104,6 @@ public class ConnectionPoolIntegrationTests : IntegrationTestBase
 
         _serviceProvider = services.BuildServiceProvider();
         _cache = _serviceProvider.GetRequiredService<IDistributedCache>();
-        _cleanupService = _serviceProvider.GetRequiredService<CleanupBackgroundService>();
-        await _cleanupService.StartAsync(default);
     }
 
     [Fact]

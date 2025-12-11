@@ -23,7 +23,6 @@ public class ConnectionFailureLogLevelIntegrationTests : IntegrationTestBase
     private PostgreSqlContainer? _postgres;
     private IDistributedCache? _cache;
     private IServiceProvider? _serviceProvider;
-    private CleanupBackgroundService? _cleanupService;
     private Mock<ILogger>? _loggerMock;
     private LogLevel _configuredConnectionFailureLogLevel = LogLevel.Warning; // Default
 
@@ -57,8 +56,7 @@ public class ConnectionFailureLogLevelIntegrationTests : IntegrationTestBase
         if (_serviceProvider is IDisposable disposable)
         {
             try
-            {
-                await (_cleanupService?.StopAsync(default) ?? Task.CompletedTask);
+            {                
                 disposable.Dispose();
             }
             catch (Exception ex)
@@ -105,10 +103,10 @@ public class ConnectionFailureLogLevelIntegrationTests : IntegrationTestBase
 
         services.AddGlacialCachePostgreSQL(options =>
         {
-            options.Connection.ConnectionString = _postgres!.GetConnectionString();
+            options.Connection.ConnectionString = new NpgsqlConnectionStringBuilder(_postgres!.GetConnectionString()) { ApplicationName = GetType().Name }.ConnectionString;
             options.Infrastructure.EnableManagerElection = false;
             options.Infrastructure.CreateInfrastructure = true;
-            options.Maintenance.EnableAutomaticCleanup = true;
+            options.Maintenance.EnableAutomaticCleanup = false;
             options.Maintenance.CleanupInterval = TimeSpan.FromMilliseconds(250);
 
             // Configure resilience options
@@ -124,8 +122,6 @@ public class ConnectionFailureLogLevelIntegrationTests : IntegrationTestBase
 
         _serviceProvider = services.BuildServiceProvider();
         _cache = _serviceProvider.GetRequiredService<IDistributedCache>();
-        _cleanupService = _serviceProvider.GetRequiredService<CleanupBackgroundService>();
-        await _cleanupService.StartAsync(default);
     }
 
     [Theory]

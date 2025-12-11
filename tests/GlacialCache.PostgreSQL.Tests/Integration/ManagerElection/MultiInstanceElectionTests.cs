@@ -10,6 +10,7 @@ using GlacialCache.PostgreSQL.Services;
 using GlacialCache.PostgreSQL.Tests.Shared;
 using GlacialCache.PostgreSQL.Models;
 using Xunit.Abstractions;
+using Npgsql;
 
 namespace GlacialCache.PostgreSQL.Tests.Integration.ManagerElection;
 
@@ -74,7 +75,7 @@ public class MultiInstanceElectionTests : IntegrationTestBase
         {
             options.Connection = new ConnectionOptions
             {
-                ConnectionString = _postgres!.GetConnectionString()
+                ConnectionString = new NpgsqlConnectionStringBuilder(_postgres!.GetConnectionString()) { ApplicationName = GetType().Name }.ConnectionString
             };
             options.Cache = new CacheOptions
             {

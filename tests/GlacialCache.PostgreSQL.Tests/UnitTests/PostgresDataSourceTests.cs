@@ -4,6 +4,7 @@ using Moq;
 using Npgsql;
 using GlacialCache.PostgreSQL.Configuration;
 using GlacialCache.PostgreSQL.Models;
+using GlacialCache.PostgreSQL.Configuration.Maintenance;
 
 namespace GlacialCache.PostgreSQL.Tests.UnitTests;
 
@@ -21,6 +22,7 @@ public class PostgresDataSourceTests
 
         var options = new GlacialCachePostgreSQLOptions
         {
+            Maintenance = new MaintenanceOptions() { EnableAutomaticCleanup = false },
             Connection = new ConnectionOptions
             {
                 ConnectionString = originalConnectionString
@@ -87,6 +89,7 @@ public class PostgresDataSourceTests
 
         var options = new GlacialCachePostgreSQLOptions
         {
+            Maintenance = new MaintenanceOptions() { EnableAutomaticCleanup = false },
             Connection = new ConnectionOptions
             {
                 ConnectionString = originalConnectionString
@@ -131,6 +134,7 @@ public class PostgresDataSourceTests
 
         var options = new GlacialCachePostgreSQLOptions
         {
+            Maintenance = new MaintenanceOptions() { EnableAutomaticCleanup = false },
             Connection = new ConnectionOptions
             {
                 ConnectionString = originalConnectionString
@@ -176,6 +180,7 @@ public class PostgresDataSourceTests
 
         var options = new GlacialCachePostgreSQLOptions
         {
+            Maintenance = new MaintenanceOptions() { EnableAutomaticCleanup = false },
             Connection = new ConnectionOptions
             {
                 ConnectionString = originalConnectionString
@@ -222,6 +227,7 @@ public class PostgresDataSourceTests
 
         var options = new GlacialCachePostgreSQLOptions
         {
+            Maintenance = new MaintenanceOptions() { EnableAutomaticCleanup = false },
             Connection = new ConnectionOptions
             {
                 ConnectionString = originalConnectionString
@@ -267,6 +273,7 @@ public class PostgresDataSourceTests
 
         var options = new GlacialCachePostgreSQLOptions
         {
+            Maintenance = new MaintenanceOptions() { EnableAutomaticCleanup = false },
             Connection = new ConnectionOptions
             {
                 ConnectionString = originalConnectionString
@@ -311,6 +318,7 @@ public class PostgresDataSourceTests
 
         var options = new GlacialCachePostgreSQLOptions
         {
+            Maintenance = new MaintenanceOptions() { EnableAutomaticCleanup = false },
             Connection = new ConnectionOptions
             {
                 ConnectionString = originalConnectionString

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Testcontainers.PostgreSql;
 using GlacialCache.PostgreSQL.Extensions;
 using GlacialCache.PostgreSQL.Abstractions;
@@ -8,6 +9,7 @@ using GlacialCache.PostgreSQL.Tests.Shared;
 using GlacialCache.PostgreSQL.Configuration;
 using GlacialCache.PostgreSQL.Services;
 using Xunit.Abstractions;
+using Npgsql;
 
 namespace GlacialCache.PostgreSQL.Tests.Integration;
 
@@ -21,7 +23,6 @@ public class SecurityFeaturesIntegrationTests : IntegrationTestBase
 {
     private PostgreSqlContainer? _postgres;
     private IServiceProvider? _serviceProvider;
-    private CleanupBackgroundService? _cleanupService;
 
     public SecurityFeaturesIntegrationTests(ITestOutputHelper output) : base(output)
     {
@@ -54,7 +55,7 @@ public class SecurityFeaturesIntegrationTests : IntegrationTestBase
         {
             try
             {
-                await (_cleanupService?.StopAsync(default) ?? Task.CompletedTask);
+                // await (_cleanupService?.StopAsync(default) ?? Task.CompletedTask);
                 disposable.Dispose();
             }
             catch (Exception ex)
@@ -92,10 +93,10 @@ public class SecurityFeaturesIntegrationTests : IntegrationTestBase
 
         services.AddGlacialCachePostgreSQL(options =>
         {
-            options.Connection.ConnectionString = _postgres!.GetConnectionString();
+            options.Connection.ConnectionString = new NpgsqlConnectionStringBuilder(_postgres!.GetConnectionString()) { ApplicationName = GetType().Name }.ConnectionString;
             options.Infrastructure.EnableManagerElection = false;
             options.Infrastructure.CreateInfrastructure = true;
-            options.Maintenance.EnableAutomaticCleanup = true;
+            options.Maintenance.EnableAutomaticCleanup = false;
             options.Maintenance.CleanupInterval = TimeSpan.FromMilliseconds(250);
 
             // Configure security options
@@ -104,8 +105,6 @@ public class SecurityFeaturesIntegrationTests : IntegrationTestBase
 
         _serviceProvider = services.BuildServiceProvider();
         var cache = _serviceProvider.GetRequiredService<IGlacialCache>();
-        _cleanupService = _serviceProvider.GetRequiredService<CleanupBackgroundService>();
-        await _cleanupService.StartAsync(default);
 
         return cache;
     }

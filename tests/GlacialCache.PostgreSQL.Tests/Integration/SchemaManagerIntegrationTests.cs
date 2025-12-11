@@ -10,6 +10,7 @@ using Testcontainers.PostgreSql;
 using GlacialCache.PostgreSQL.Tests.Shared;
 using Xunit;
 using Xunit.Abstractions;
+using GlacialCache.PostgreSQL.Configuration.Maintenance;
 
 namespace GlacialCache.PostgreSQL.Tests.Integration;
 
@@ -302,6 +303,7 @@ public abstract class SchemaManagerTestBase : IntegrationTestBase
     {
         return new GlacialCachePostgreSQLOptions
         {
+            Maintenance = new() { EnableAutomaticCleanup = false },
             Infrastructure = new InfrastructureOptions
             {
                 CreateInfrastructure = true

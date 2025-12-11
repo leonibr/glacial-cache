@@ -9,6 +9,7 @@ using GlacialCache.PostgreSQL.Abstractions;
 using GlacialCache.PostgreSQL.Models;
 using GlacialCache.PostgreSQL.Configuration.Resilience;
 using GlacialCache.PostgreSQL.Services;
+using GlacialCache.PostgreSQL.Configuration.Maintenance;
 
 namespace GlacialCache.PostgreSQL.Tests.UnitTests;
 
@@ -46,6 +47,7 @@ public class GlacialCachePostgreSQLTests
         // Arrange
         var options = new GlacialCachePostgreSQLOptions
         {
+            Maintenance = new MaintenanceOptions() { EnableAutomaticCleanup = false },
             Connection = new ConnectionOptions
             {
                 ConnectionString = "Host=localhost;Port=5432;Database=testdb;Username=testuser;Password=testpass"
@@ -120,6 +122,7 @@ public class GlacialCachePostgreSQLTests
         // Arrange
         var options = new GlacialCachePostgreSQLOptions
         {
+            Maintenance = new MaintenanceOptions() { EnableAutomaticCleanup = false },
             Connection = new ConnectionOptions
             {
                 ConnectionString = "Host=localhost;Port=5432;Database=testdb;Username=testuser;Password=testpass"
@@ -184,6 +187,7 @@ public class GlacialCachePostgreSQLTests
         // Arrange
         var options = new GlacialCachePostgreSQLOptions
         {
+            Maintenance = new MaintenanceOptions() { EnableAutomaticCleanup = false },
             Connection = new ConnectionOptions
             {
                 ConnectionString = "Host=localhost;Port=5432;Database=testdb;Username=testuser;Password=testpass"

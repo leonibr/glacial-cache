@@ -24,7 +24,6 @@ public class BackoffStrategyIntegrationTests : IntegrationTestBase
     private PostgreSqlContainer? _postgres;
     private IDistributedCache? _cache;
     private IServiceProvider? _serviceProvider;
-    private CleanupBackgroundService? _cleanupService;
 
     public BackoffStrategyIntegrationTests(ITestOutputHelper output) : base(output)
     {
@@ -57,7 +56,6 @@ public class BackoffStrategyIntegrationTests : IntegrationTestBase
         {
             try
             {
-                await (_cleanupService?.StopAsync(default) ?? Task.CompletedTask);
                 disposable.Dispose();
             }
             catch (Exception ex)
@@ -131,9 +129,6 @@ public class BackoffStrategyIntegrationTests : IntegrationTestBase
 
         _serviceProvider = services.BuildServiceProvider();
         var cache = _serviceProvider.GetRequiredService<IDistributedCache>();
-        _cleanupService = _serviceProvider.GetRequiredService<CleanupBackgroundService>();
-        await _cleanupService.StartAsync(default);
-
         return (cache, mockLogger);
     }
 

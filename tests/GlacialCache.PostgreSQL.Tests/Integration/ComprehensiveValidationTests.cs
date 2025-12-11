@@ -23,7 +23,6 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
     private ServiceProvider? _serviceProvider;
     private IGlacialCache? _glacialCache;
     private IDistributedCache? _distributedCache;
-    private CleanupBackgroundService? _cleanupService;
     private NpgsqlDataSource? _dataSource;
 
     public ComprehensiveValidationTests(ITestOutputHelper output) : base(output)
@@ -51,7 +50,7 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
 
             services.AddGlacialCachePostgreSQL(options =>
             {
-                options.Connection.ConnectionString = _postgres.GetConnectionString();
+                options.Connection.ConnectionString = new NpgsqlConnectionStringBuilder(_postgres.GetConnectionString()) { ApplicationName = GetType().Name }.ConnectionString;
                 options.Cache.DefaultSlidingExpiration = TimeSpan.FromMinutes(10);
                 options.Cache.DefaultAbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);
                 options.Infrastructure.EnableManagerElection = false;
@@ -61,16 +60,6 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
             _serviceProvider = services.BuildServiceProvider();
             _glacialCache = _serviceProvider.GetRequiredService<IGlacialCache>();
             _distributedCache = _serviceProvider.GetRequiredService<IDistributedCache>();
-
-            // Get cleanup service if it exists
-            try
-            {
-                _cleanupService = _serviceProvider.GetService<CleanupBackgroundService>();
-            }
-            catch
-            {
-                // Cleanup service might not be registered, that's okay
-            }
 
             // Create data source for proper disposal
             _dataSource = NpgsqlDataSource.Create(_postgres.GetConnectionString());
@@ -86,13 +75,6 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
     {
         try
         {
-            // Stop and dispose background service first
-            if (_cleanupService != null)
-            {
-                await _cleanupService.StopAsync(default);
-                _cleanupService.Dispose();
-            }
-
             // Dispose data source
             if (_dataSource != null)
             {

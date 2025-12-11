@@ -22,6 +22,7 @@ internal class CleanupBackgroundService : BackgroundService, ICleanupBackgroundS
     private readonly ElectionState? _electionState;
     private readonly TimeProvider _timeProvider;
     private readonly PeriodicTimer _cleanupTimer;
+    private bool _disposed = false;
 
     public CleanupBackgroundService(
         IOptionsMonitor<GlacialCachePostgreSQLOptions> options,
@@ -61,10 +62,17 @@ internal class CleanupBackgroundService : BackgroundService, ICleanupBackgroundS
         }
         catch (OperationCanceledException)
         {
+            // Normal shutdown via cancellation token
+            _logger.LogCleanupServiceStopping();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Normal shutdown via timer disposal
             _logger.LogCleanupServiceStopping();
         }
         catch (Exception ex)
         {
+            // Actual error
             _logger.LogCleanupServiceError(ex);
         }
     }
@@ -115,6 +123,13 @@ internal class CleanupBackgroundService : BackgroundService, ICleanupBackgroundS
 
     public override void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
         try
         {
             _cleanupTimer?.Dispose();
@@ -124,7 +139,9 @@ internal class CleanupBackgroundService : BackgroundService, ICleanupBackgroundS
         {
             _logger?.LogWarning(ex, "Error disposing CleanupBackgroundService");
         }
-
-        base.Dispose();
+        finally
+        {
+            base.Dispose();
+        }
     }
 }

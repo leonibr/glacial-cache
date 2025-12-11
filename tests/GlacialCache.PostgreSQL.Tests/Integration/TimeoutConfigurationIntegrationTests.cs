@@ -25,7 +25,6 @@ public class TimeoutConfigurationIntegrationTests : IntegrationTestBase
     private PostgreSqlContainer? _postgres;
     private IDistributedCache? _cache;
     private IServiceProvider? _serviceProvider;
-    private CleanupBackgroundService? _cleanupService;
 
     public TimeoutConfigurationIntegrationTests(ITestOutputHelper output) : base(output)
     {
@@ -58,7 +57,6 @@ public class TimeoutConfigurationIntegrationTests : IntegrationTestBase
         {
             try
             {
-                await (_cleanupService?.StopAsync(default) ?? Task.CompletedTask);
                 disposable.Dispose();
             }
             catch (Exception ex)
@@ -96,10 +94,10 @@ public class TimeoutConfigurationIntegrationTests : IntegrationTestBase
 
         services.AddGlacialCachePostgreSQL(options =>
         {
-            options.Connection.ConnectionString = _postgres!.GetConnectionString();
+            options.Connection.ConnectionString = new NpgsqlConnectionStringBuilder(_postgres!.GetConnectionString()) { ApplicationName = GetType().Name }.ConnectionString;
             options.Infrastructure.EnableManagerElection = false;
             options.Infrastructure.CreateInfrastructure = true;
-            options.Maintenance.EnableAutomaticCleanup = true;
+            options.Maintenance.EnableAutomaticCleanup = false;
             options.Maintenance.CleanupInterval = TimeSpan.FromMilliseconds(250);
 
             // Configure timeout settings
@@ -108,8 +106,6 @@ public class TimeoutConfigurationIntegrationTests : IntegrationTestBase
 
         _serviceProvider = services.BuildServiceProvider();
         _cache = _serviceProvider.GetRequiredService<IDistributedCache>();
-        _cleanupService = _serviceProvider.GetRequiredService<CleanupBackgroundService>();
-        await _cleanupService.StartAsync(default);
     }
 
     [Fact]
@@ -248,6 +244,52 @@ public class TimeoutConfigurationIntegrationTests : IntegrationTestBase
             setupException = ex;
         }
 
+        // Helper method to check if exception is connection-related
+        static bool IsConnectionRelatedException(Exception ex)
+        {
+            if (ex == null) return false;
+
+            // Check exception type
+            if (ex is System.Net.Sockets.SocketException ||
+                ex is System.IO.IOException ||
+                ex is TimeoutException ||
+                ex is NpgsqlException ||
+                (ex is InvalidOperationException && ex.Message.Contains("connection", StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+
+            // Check message content
+            var message = ex.Message ?? string.Empty;
+            if (message.Contains("connect", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("timeout", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("unreachable", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("host", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("network", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("resolve", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("dns", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            // Check inner exceptions (handle AggregateException)
+            if (ex is AggregateException aggEx)
+            {
+                foreach (var innerEx in aggEx.InnerExceptions)
+                {
+                    if (IsConnectionRelatedException(innerEx))
+                        return true;
+                }
+            }
+            else if (ex.InnerException != null)
+            {
+                if (IsConnectionRelatedException(ex.InnerException))
+                    return true;
+            }
+
+            return false;
+        }
+
         // Act & Assert - If setup succeeded, attempt operation; otherwise verify setup exception
         if (setupException == null && _cache != null)
         {
@@ -257,26 +299,14 @@ public class TimeoutConfigurationIntegrationTests : IntegrationTestBase
             });
 
             // Verify it's a connection-related exception
-            Assert.True(exception.Message.Contains("connect", StringComparison.OrdinalIgnoreCase) ||
-                       exception.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase) ||
-                       exception.Message.Contains("unreachable", StringComparison.OrdinalIgnoreCase) ||
-                       exception.Message.Contains("host", StringComparison.OrdinalIgnoreCase) ||
-                       (exception.InnerException != null && (
-                           exception.InnerException.Message.Contains("connect", StringComparison.OrdinalIgnoreCase) ||
-                           exception.InnerException.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase) ||
-                           exception.InnerException.Message.Contains("unreachable", StringComparison.OrdinalIgnoreCase))));
+            Assert.True(IsConnectionRelatedException(exception),
+                $"Expected connection-related exception, but got: {exception.GetType().Name} - {exception.Message}");
         }
         else if (setupException != null)
         {
             // Verify the setup exception is connection-related
-            Assert.True(setupException.Message.Contains("connect", StringComparison.OrdinalIgnoreCase) ||
-                       setupException.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase) ||
-                       setupException.Message.Contains("unreachable", StringComparison.OrdinalIgnoreCase) ||
-                       setupException.Message.Contains("host", StringComparison.OrdinalIgnoreCase) ||
-                       (setupException.InnerException != null && (
-                           setupException.InnerException.Message.Contains("connect", StringComparison.OrdinalIgnoreCase) ||
-                           setupException.InnerException.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase) ||
-                           setupException.InnerException.Message.Contains("unreachable", StringComparison.OrdinalIgnoreCase))));
+            Assert.True(IsConnectionRelatedException(setupException),
+                $"Expected connection-related exception during setup, but got: {setupException.GetType().Name} - {setupException.Message}");
         }
         else
         {

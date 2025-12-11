@@ -1,6 +1,7 @@
 using GlacialCache.PostgreSQL.Services;
 using GlacialCache.PostgreSQL.Configuration;
 using Microsoft.Extensions.Logging;
+using GlacialCache.PostgreSQL.Configuration.Maintenance;
 
 namespace GlacialCache.PostgreSQL.Tests.UnitTests;
 
@@ -19,6 +20,7 @@ public class ConfigurationValidationTests
         // Arrange
         var options = new GlacialCachePostgreSQLOptions
         {
+            Maintenance = new MaintenanceOptions() { EnableAutomaticCleanup = false },
             Connection = new ConnectionOptions
             {
                 ConnectionString = "Host=localhost;Database=testdb;Username=testuser;Password=testpass"
@@ -72,6 +74,7 @@ public class ConfigurationValidationTests
         // Arrange
         var options = new GlacialCachePostgreSQLOptions
         {
+            Maintenance = new MaintenanceOptions() { EnableAutomaticCleanup = false },
             Connection = new ConnectionOptions
             {
                 ConnectionString = "Host=localhost;Database=testdb;Username=testuser;Password=testpass"
@@ -95,6 +98,7 @@ public class ConfigurationValidationTests
         // Arrange
         var options = new GlacialCachePostgreSQLOptions
         {
+            Maintenance = new MaintenanceOptions() { EnableAutomaticCleanup = false },
             Connection = new ConnectionOptions
             {
                 ConnectionString = "Host=localhost;Database=testdb;Username=testuser;Password=testpass"
@@ -118,6 +122,7 @@ public class ConfigurationValidationTests
         // Arrange
         var options = new GlacialCachePostgreSQLOptions
         {
+            Maintenance = new MaintenanceOptions() { EnableAutomaticCleanup = false },
             Connection = new ConnectionOptions
             {
                 ConnectionString = "Host=localhost;Database=testdb;Username=testuser;Password=testpass"
@@ -209,6 +214,7 @@ public class ConfigurationValidationTests
         // Arrange - Using a very long table name that will exceed 63 bytes when combined with index suffixes
         var options = new GlacialCachePostgreSQLOptions
         {
+            Maintenance = new MaintenanceOptions() { EnableAutomaticCleanup = false },
             Connection = new ConnectionOptions
             {
                 ConnectionString = "Host=localhost;Database=testdb;Username=testuser;Password=testpass"
@@ -232,6 +238,7 @@ public class ConfigurationValidationTests
         // Arrange
         var options = new GlacialCachePostgreSQLOptions
         {
+            Maintenance = new MaintenanceOptions() { EnableAutomaticCleanup = false },
             Connection = new ConnectionOptions
             {
                 ConnectionString = "Host=localhost;Database=testdb;Username=testuser;Password=testpass"
@@ -293,6 +300,7 @@ public class ConfigurationValidationTests
         // Arrange
         var options = new GlacialCachePostgreSQLOptions
         {
+            Maintenance = new MaintenanceOptions() { EnableAutomaticCleanup = false },
             Connection = new ConnectionOptions
             {
                 ConnectionString = "Host=localhost;Database=testdb;Username=testuser;Password=testpass"
@@ -318,6 +326,7 @@ public class ConfigurationValidationTests
         // Arrange
         var options = new GlacialCachePostgreSQLOptions
         {
+            Maintenance = new MaintenanceOptions() { EnableAutomaticCleanup = false },
             Connection = new ConnectionOptions
             {
                 ConnectionString = "Host=localhost;Database=testdb;Username=testuser;Password=testpass"
@@ -352,6 +361,7 @@ public class ConfigurationValidationTests
         // For now, we test it indirectly through the validation methods
         var options = new GlacialCachePostgreSQLOptions
         {
+            Maintenance = new MaintenanceOptions() { EnableAutomaticCleanup = false },
             Connection = new ConnectionOptions
             {
                 ConnectionString = "Host=localhost;Database=testdb;Username=testuser;Password=testpass"

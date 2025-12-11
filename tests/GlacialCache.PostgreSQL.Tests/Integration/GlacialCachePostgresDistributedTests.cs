@@ -8,6 +8,7 @@ using GlacialCache.PostgreSQL.Tests.Shared;
 using System.Text;
 using Xunit.Abstractions;
 using GlacialCache.PostgreSQL.Services;
+using Npgsql;
 
 namespace GlacialCache.PostgreSQL.Tests.IntegrationTests;
 
@@ -21,7 +22,6 @@ public class GlacialCachePostgresDistributedTests : IntegrationTestBase
     private IDistributedCache? _cache;
     private IGlacialCache? _glacial;
     private IServiceProvider? _serviceProvider;
-    private CleanupBackgroundService? _cleanupService;
 
     public GlacialCachePostgresDistributedTests(ITestOutputHelper output) : base(output)
     {
@@ -49,18 +49,16 @@ public class GlacialCachePostgresDistributedTests : IntegrationTestBase
 
             services.AddGlacialCachePostgreSQL(options =>
             {
-                options.Connection.ConnectionString = _postgres.GetConnectionString();
+                options.Connection.ConnectionString = new NpgsqlConnectionStringBuilder(_postgres.GetConnectionString()) { ApplicationName = GetType().Name }.ConnectionString;
                 options.Infrastructure.EnableManagerElection = false;
                 options.Infrastructure.CreateInfrastructure = true;
-                options.Maintenance.EnableAutomaticCleanup = true;
+                options.Maintenance.EnableAutomaticCleanup = false;
                 options.Maintenance.CleanupInterval = TimeSpan.FromMilliseconds(250);
             });
 
             _serviceProvider = services.BuildServiceProvider();
             _cache = _serviceProvider.GetRequiredService<IDistributedCache>();
             _glacial = _serviceProvider.GetRequiredService<IGlacialCache>();
-            _cleanupService = _serviceProvider.GetRequiredService<CleanupBackgroundService>();
-            await _cleanupService.StartAsync(default);
         }
         catch (Exception ex)
         {

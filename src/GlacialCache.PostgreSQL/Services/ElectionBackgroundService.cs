@@ -226,6 +226,22 @@ internal class ElectionBackgroundService : BackgroundService
 
             return acquired;
         }
+        catch (PostgresException ex) when (ex.SqlState == "42501") // Insufficient privilege
+        {
+            _logger.LogError(ex,
+                "Advisory lock permission denied for instance {InstanceId}. " +
+                "Automatic coordination disabled. For multi-instance deployments:\n" +
+                "1. Grant permissions: GRANT EXECUTE ON FUNCTION pg_try_advisory_lock(bigint), " +
+                "   pg_advisory_unlock(bigint), pg_advisory_lock(bigint), " +
+                "   pg_try_advisory_lock_shared(bigint), pg_advisory_unlock_shared(bigint) TO user\n" +
+                "2. Or disable coordination: Set EnableManagerElection=false\n" +
+                "3. Or disable infrastructure creation: Set CreateInfrastructure=false on all but one instance\n" +
+                "4. Manually coordinate cleanup: Choose which instances handle automatic cleanup\n" +
+                "   using EnableAutomaticCleanup flag in your configuration",
+                _electionState.InstanceId);
+
+            return false;
+        }
         catch (Exception ex)
         {
             _logger.LogElectionServiceError(_electionState.InstanceId, ex);
@@ -263,6 +279,22 @@ internal class ElectionBackgroundService : BackgroundService
 
             return stillHoldsLock;
         }
+        catch (PostgresException ex) when (ex.SqlState == "42501") // Insufficient privilege
+        {
+            _logger.LogError(ex,
+                "Advisory lock permission denied for instance {InstanceId} during lock verification. " +
+                "Automatic coordination disabled. For multi-instance deployments:\n" +
+                "1. Grant permissions: GRANT EXECUTE ON FUNCTION pg_try_advisory_lock(bigint), " +
+                "   pg_advisory_unlock(bigint), pg_advisory_lock(bigint), " +
+                "   pg_try_advisory_lock_shared(bigint), pg_advisory_unlock_shared(bigint) TO user\n" +
+                "2. Or disable coordination: Set EnableManagerElection=false\n" +
+                "3. Or disable infrastructure creation: Set CreateInfrastructure=false on all but one instance\n" +
+                "4. Manually coordinate cleanup: Choose which instances handle automatic cleanup\n" +
+                "   using EnableAutomaticCleanup flag in your configuration",
+                _electionState.InstanceId);
+
+            return false;
+        }
         catch (Exception ex)
         {
             _logger.LogElectionServiceError(_electionState.InstanceId, ex);
@@ -281,6 +313,17 @@ internal class ElectionBackgroundService : BackgroundService
                 command.Parameters.AddWithValue("@lockKey", _lockOptions.AdvisoryLockKey);
                 await command.ExecuteNonQueryAsync(cancellationToken);
             }
+        }
+        catch (PostgresException ex) when (ex.SqlState == "42501") // Insufficient privilege
+        {
+            _logger.LogWarning(ex,
+                "Advisory lock permission denied for instance {InstanceId} during lock release. " +
+                "Lock cleanup may be incomplete. For multi-instance deployments:\n" +
+                "1. Grant permissions: GRANT EXECUTE ON FUNCTION pg_try_advisory_lock(bigint), " +
+                "   pg_advisory_unlock(bigint), pg_advisory_lock(bigint), " +
+                "   pg_try_advisory_lock_shared(bigint), pg_advisory_unlock_shared(bigint) TO user\n" +
+                "2. Or disable coordination: Set EnableManagerElection=false",
+                _electionState.InstanceId);
         }
         catch (Exception ex)
         {

@@ -22,7 +22,7 @@
 
 ---
 
-### Why GlacialCache?
+### Why GlacialCache❓
 
 - **Reuse PostgreSQL, skip new infra**: No Redis cluster to deploy or operate — GlacialCache rides on top of the PostgreSQL you already run.
 - **Drop-in `IDistributedCache`**: Works with standard ASP.NET Core patterns while also exposing richer APIs when you need them.

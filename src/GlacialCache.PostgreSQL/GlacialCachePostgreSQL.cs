@@ -1140,7 +1140,8 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
         {
             try
             {
-                return await _resiliencePolicy.ExecuteAsync(() => operation).ConfigureAwait(false);
+                var context = new Context { ["OperationKey"] = operationName };
+                return await _resiliencePolicy.ExecuteAsync(ctx => operation, context).ConfigureAwait(false);
             }
             catch (Exception ex) when (IsConnectionFailure(ex))
             {
@@ -1160,7 +1161,8 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
         {
             try
             {
-                await _resiliencePolicy.ExecuteAsync(() => operation).ConfigureAwait(false);
+                var context = new Context { ["OperationKey"] = operationName };
+                await _resiliencePolicy.ExecuteAsync(ctx => operation, context).ConfigureAwait(false);
             }
             catch (Exception ex) when (IsConnectionFailure(ex))
             {

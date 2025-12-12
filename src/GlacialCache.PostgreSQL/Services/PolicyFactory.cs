@@ -41,7 +41,7 @@ public class PolicyFactory : IPolicyFactory
                     {
                         _logger.LogDebug(exception,
                             "Retry attempt {RetryCount} for operation {Operation} after {Delay}ms",
-                            retryCount, context.OperationKey, timeSpan.TotalMilliseconds);
+                            retryCount, context.OperationKey ?? "Unknown", timeSpan.TotalMilliseconds);
                     }
                 });
     }

@@ -75,8 +75,8 @@ public class GlacialCachePostgreSQLTests
         // GetAsync calls ExecuteWithResilienceAsync<byte[]?>, so we need to mock Func<Task<byte[]?>>
         // The policy should just execute the function and let exceptions propagate naturally
         mockPolicy
-            .Setup(p => p.ExecuteAsync(It.IsAny<Func<Task<byte[]?>>>()))
-            .Returns<Func<Task<byte[]?>>>(async func => await func());
+            .Setup(p => p.ExecuteAsync(It.IsAny<Func<Context, Task<byte[]?>>>(), It.IsAny<Context>()))
+            .Returns<Func<Context, Task<byte[]?>>, Context>((func, ctx) => func(ctx));
 
         _policyFactory.Setup(p => p.CreateResiliencePolicy(options)).Returns(mockPolicy.Object);
         _serviceProvider.Setup(sp => sp.GetService(typeof(IPolicyFactory))).Returns(_policyFactory.Object);
@@ -149,8 +149,8 @@ public class GlacialCachePostgreSQLTests
         // The policy will execute the operation, which will throw from GetConnectionAsync
         // We need to make sure the exception propagates through the policy
         mockPolicy
-            .Setup(p => p.ExecuteAsync(It.IsAny<Func<Task>>()))
-            .Returns<Func<Task>>(async func => await func());
+            .Setup(p => p.ExecuteAsync(It.IsAny<Func<Context, Task>>(), It.IsAny<Context>()))
+            .Returns<Func<Context, Task>, Context>((func, ctx) => func(ctx));
 
         _policyFactory.Setup(p => p.CreateResiliencePolicy(options)).Returns(mockPolicy.Object);
         _serviceProvider.Setup(sp => sp.GetService(typeof(IPolicyFactory))).Returns(_policyFactory.Object);
@@ -215,8 +215,8 @@ public class GlacialCachePostgreSQLTests
         // GetAsync calls ExecuteWithResilienceAsync<byte[]?>, so we need to mock Func<Task<byte[]?>>
         // The policy should just execute the function and let exceptions propagate naturally
         mockPolicy
-            .Setup(p => p.ExecuteAsync(It.IsAny<Func<Task<byte[]?>>>()))
-            .Returns<Func<Task<byte[]?>>>(async func => await func());
+            .Setup(p => p.ExecuteAsync(It.IsAny<Func<Context, Task<byte[]?>>>(), It.IsAny<Context>()))
+            .Returns<Func<Context, Task<byte[]?>>, Context>((func, ctx) => func(ctx));
 
         _policyFactory.Setup(p => p.CreateResiliencePolicy(options)).Returns(mockPolicy.Object);
         _serviceProvider.Setup(sp => sp.GetService(typeof(IPolicyFactory))).Returns(_policyFactory.Object);

@@ -1,16 +1,16 @@
+using GlacialCache.PostgreSQL.Abstractions;
+using GlacialCache.PostgreSQL.Configuration;
+using GlacialCache.PostgreSQL.Configuration.Resilience;
+using GlacialCache.PostgreSQL.Extensions;
+using GlacialCache.PostgreSQL.Services;
+using GlacialCache.PostgreSQL.Tests.Shared;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Testcontainers.PostgreSql;
-using GlacialCache.PostgreSQL.Extensions;
-using GlacialCache.PostgreSQL.Abstractions;
-using GlacialCache.PostgreSQL.Tests.Shared;
-using GlacialCache.PostgreSQL.Configuration;
-using GlacialCache.PostgreSQL.Configuration.Resilience;
-using GlacialCache.PostgreSQL.Services;
-using Xunit.Abstractions;
-using Npgsql;
 using Moq;
+using Npgsql;
+using Testcontainers.PostgreSql;
+using Xunit.Abstractions;
 
 namespace GlacialCache.PostgreSQL.Tests.Integration;
 
@@ -176,8 +176,8 @@ public class BackoffStrategyIntegrationTests : IntegrationTestBase
         // Act - Execute operation that will fail and trigger retries
         await ExecuteOperationWithTransientFailuresAsync("test-key", 0);
 
-        // Assert - Verify that retry attempts were logged (proves retries happened)
-        // With MaxAttempts=3, we should see 2 retry log entries (attempts 2 and 3)
+        // Assert - Verify that retry attempts occurred
+        // Retry logs work on all .NET versions locally, but may behave differently in CI
         logger.Verify(
             x => x.Log(
                 LogLevel.Debug,
@@ -185,7 +185,7 @@ public class BackoffStrategyIntegrationTests : IntegrationTestBase
                 It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Retry attempt")),
                 It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-            Times.AtLeast(2), // At least 2 retry attempts should be logged
+            Times.AtLeast(2),
             "Linear backoff should trigger retries");
     }
 
@@ -202,7 +202,8 @@ public class BackoffStrategyIntegrationTests : IntegrationTestBase
         // Act - Execute operation that will fail and trigger retries
         await ExecuteOperationWithTransientFailuresAsync("exp-test-key", 0);
 
-        // Assert - Verify that retry attempts were logged (proves retries happened)
+        // Assert - Verify that retry attempts occurred
+        // Retry logs work on all .NET versions locally, but may behave differently in CI
         logger.Verify(
             x => x.Log(
                 LogLevel.Debug,
@@ -210,7 +211,7 @@ public class BackoffStrategyIntegrationTests : IntegrationTestBase
                 It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Retry attempt")),
                 It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-            Times.AtLeast(2), // At least 2 retry attempts should be logged
+            Times.AtLeast(2),
             "Exponential backoff should trigger retries");
     }
 
@@ -227,7 +228,8 @@ public class BackoffStrategyIntegrationTests : IntegrationTestBase
         // Act - Execute operation that will fail and trigger retries
         await ExecuteOperationWithTransientFailuresAsync("jitter-test-key", 0);
 
-        // Assert - Verify that retry attempts were logged (proves retries happened)
+        // Assert - Verify that retry attempts occurred
+        // Retry logs work on all .NET versions locally, but may behave differently in CI
         logger.Verify(
             x => x.Log(
                 LogLevel.Debug,
@@ -235,7 +237,7 @@ public class BackoffStrategyIntegrationTests : IntegrationTestBase
                 It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Retry attempt")),
                 It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-            Times.AtLeast(2), // At least 2 retry attempts should be logged
+            Times.AtLeast(2),
             "Exponential with jitter backoff should trigger retries");
 
         // Note: Verifying exact jitter variation would require parsing log messages,
@@ -256,7 +258,8 @@ public class BackoffStrategyIntegrationTests : IntegrationTestBase
         // Act - Execute operation that will fail and trigger retries
         await ExecuteOperationWithTransientFailuresAsync("default-test-key", 0);
 
-        // Assert - Verify that retry attempts were logged (proves retries happened)
+        // Assert - Verify that retry attempts occurred
+        // Retry logs work on all .NET versions locally, but may behave differently in CI
         logger.Verify(
             x => x.Log(
                 LogLevel.Debug,
@@ -264,7 +267,7 @@ public class BackoffStrategyIntegrationTests : IntegrationTestBase
                 It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Retry attempt")),
                 It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-            Times.AtLeast(2), // At least 2 retry attempts should be logged
+            Times.AtLeast(2),
             "Default backoff (ExponentialWithJitter) should trigger retries");
     }
 
@@ -287,7 +290,8 @@ public class BackoffStrategyIntegrationTests : IntegrationTestBase
             // Act
             await ExecuteOperationWithTransientFailuresAsync($"delay-test-key-{baseDelay.TotalMilliseconds}", 0);
 
-            // Assert - Verify that retries were logged (proves retries happened)
+            // Assert - Verify that retry attempts occurred
+            // Retry logs work on all .NET versions locally, but may behave differently in CI
             logger.Verify(
                 x => x.Log(
                     LogLevel.Debug,
@@ -325,6 +329,7 @@ public class BackoffStrategyIntegrationTests : IntegrationTestBase
 
         // Assert - With MaxAttempts=1, we should see exactly 1 retry log entry
         // MaxAttempts=1 means 1 retry, so 2 total attempts (1 initial + 1 retry)
+        // Retry logs work on all .NET versions locally, but may behave differently in CI
         logger.Verify(
             x => x.Log(
                 LogLevel.Debug,
@@ -332,7 +337,7 @@ public class BackoffStrategyIntegrationTests : IntegrationTestBase
                 It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Retry attempt")),
                 It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-            Times.Once, // Exactly 1 retry (1 initial attempt + 1 retry = 2 total attempts)
+            Times.Once,
             "With MaxAttempts=1, should see exactly 1 retry log entry");
     }
 

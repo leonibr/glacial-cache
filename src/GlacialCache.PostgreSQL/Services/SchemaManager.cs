@@ -7,6 +7,27 @@ using Npgsql;
 namespace GlacialCache.PostgreSQL.Services;
 
 /// <summary>
+/// Represents the result of attempting to acquire an advisory lock for schema creation.
+/// </summary>
+internal enum LockAcquisitionResult
+{
+    /// <summary>
+    /// Lock was successfully acquired by this instance.
+    /// </summary>
+    Acquired,
+
+    /// <summary>
+    /// Lock is held by another instance. This instance should wait for schema readiness.
+    /// </summary>
+    HeldByOther,
+
+    /// <summary>
+    /// Permission was denied to use advisory locks. Coordination is not possible.
+    /// </summary>
+    PermissionDenied
+}
+
+/// <summary>
 /// Manages PostgreSQL schema creation and validation for GlacialCache.
 /// Provides idempotent schema operations with comprehensive error handling and advisory lock coordination.
 /// </summary>
@@ -49,18 +70,32 @@ public class SchemaManager : ISchemaManager
         await using var lockConnection = await _dataSource.GetConnectionAsync(token);
 
         // Try to acquire PostgreSQL advisory lock
-        var lockAcquired = await TryAcquireInfrastructureLockAsync(lockConnection, token);
+        var lockResult = await TryAcquireInfrastructureLockAsync(lockConnection, token);
 
-        if (!lockAcquired)
+        // Handle different lock acquisition results
+        switch (lockResult)
         {
-            _logger.LogInformation("Another instance is creating infrastructure, waiting for schema to be ready");
-            await WaitForSchemaReadyAsync(token);
-            return;
+            case LockAcquisitionResult.HeldByOther:
+                _logger.LogInformation("Another instance is creating infrastructure, waiting for schema to be ready");
+                await WaitForSchemaReadyAsync(token);
+                return;
+
+            case LockAcquisitionResult.PermissionDenied:
+                _logger.LogWarning(
+                    "Advisory lock permission denied - proceeding with schema creation without coordination. " +
+                    "In multi-instance deployments, this may cause race conditions. " +
+                    "Consider granting advisory lock permissions or coordinating schema creation manually.");
+                // Fall through to create schema
+                break;
+
+            case LockAcquisitionResult.Acquired:
+                _logger.LogInformation("Acquired infrastructure lock, proceeding with schema creation");
+                // Fall through to create schema
+                break;
         }
 
         try
         {
-            _logger.LogInformation("Acquired infrastructure lock, proceeding with schema creation");
 
             // Step 1: Check schema permissions and create schema
             if (!await CanCreateSchemaAsync(lockConnection, token))
@@ -100,7 +135,7 @@ public class SchemaManager : ISchemaManager
         // Lock automatically released when lockConnection is disposed
     }
 
-    private async Task<bool> TryAcquireInfrastructureLockAsync(NpgsqlConnection connection, CancellationToken token)
+    private async Task<LockAcquisitionResult> TryAcquireInfrastructureLockAsync(NpgsqlConnection connection, CancellationToken token)
     {
         try
         {
@@ -112,7 +147,9 @@ public class SchemaManager : ISchemaManager
             command.CommandTimeout = 5; // 5 second timeout
 
             var result = await command.ExecuteScalarAsync(token);
-            return Convert.ToBoolean(result);
+            var lockAcquired = Convert.ToBoolean(result);
+
+            return lockAcquired ? LockAcquisitionResult.Acquired : LockAcquisitionResult.HeldByOther;
         }
         catch (PostgresException ex) when (ex.SqlState == "42501") // Insufficient privilege
         {
@@ -124,12 +161,12 @@ public class SchemaManager : ISchemaManager
                 "   pg_try_advisory_lock_shared(bigint), pg_advisory_unlock_shared(bigint) TO user\n" +
                 "2. Or disable coordination: Set CreateInfrastructure=false on all but one instance\n" +
                 "3. Manually coordinate schema creation: Choose which instance handles schema creation");
-            return false;
+            return LockAcquisitionResult.PermissionDenied;
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to acquire infrastructure lock");
-            return false;
+            return LockAcquisitionResult.HeldByOther;
         }
     }
 
@@ -309,26 +346,26 @@ ON {_nomeclature.FullTableName} (next_expiration);";
         while (DateTime.UtcNow - startTime < timeout)
         {
             attemptCount++;
-            
+
             if (await IsSchemaReadyAsync(token))
             {
-                _logger.LogInformation("Schema is ready after {AttemptCount} attempt(s) and {ElapsedMs}ms", 
+                _logger.LogInformation("Schema is ready after {AttemptCount} attempt(s) and {ElapsedMs}ms",
                     attemptCount, (DateTime.UtcNow - startTime).TotalMilliseconds);
                 return;
             }
 
-            _logger.LogDebug("Schema not yet ready, attempt {AttemptCount}, waiting {DelayMs}ms before retry", 
+            _logger.LogDebug("Schema not yet ready, attempt {AttemptCount}, waiting {DelayMs}ms before retry",
                 attemptCount, delay.TotalMilliseconds);
 
             await Task.Delay(delay, token);
-            
+
             // Exponential backoff with max delay
             delay = TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds * 1.5, maxDelay));
         }
 
         _logger.LogWarning(
             "Timeout after {Timeout}s waiting for schema to be ready. " +
-            "Proceeding anyway - operations may fail until schema is created by another instance", 
+            "Proceeding anyway - operations may fail until schema is created by another instance",
             timeout.TotalSeconds);
     }
 
@@ -343,7 +380,7 @@ ON {_nomeclature.FullTableName} (next_expiration);";
             await using var command = new NpgsqlCommand(
                 $"SELECT 1 FROM {_nomeclature.FullTableName} LIMIT 0",
                 connection);
-            
+
             await command.ExecuteNonQueryAsync(token);
             return true;
         }

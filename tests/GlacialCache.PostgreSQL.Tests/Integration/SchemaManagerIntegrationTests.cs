@@ -412,6 +412,9 @@ public abstract class SchemaManagerTestBase : IntegrationTestBase
         {
             await connection.DisposeAsync();
         }
+
+        // Grant advisory lock permissions using the helper extension method
+        await _postgres!.GrantAdvisoryLockPermissionsAsync("testuser", Output);
     }
 
 }

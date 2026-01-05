@@ -1,15 +1,15 @@
+using GlacialCache.PostgreSQL.Abstractions;
+using GlacialCache.PostgreSQL.Configuration;
+using GlacialCache.PostgreSQL.Extensions;
+using GlacialCache.PostgreSQL.Services;
+using GlacialCache.PostgreSQL.Tests.Shared;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Testcontainers.PostgreSql;
-using GlacialCache.PostgreSQL.Extensions;
-using GlacialCache.PostgreSQL.Tests.Shared;
-using GlacialCache.PostgreSQL.Services;
-using GlacialCache.PostgreSQL.Configuration;
-using GlacialCache.PostgreSQL.Abstractions;
-using Xunit.Abstractions;
 using Npgsql;
+using Testcontainers.PostgreSql;
+using Xunit.Abstractions;
 
 namespace GlacialCache.PostgreSQL.Tests.Integration;
 

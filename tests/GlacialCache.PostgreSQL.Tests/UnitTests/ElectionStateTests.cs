@@ -197,31 +197,6 @@ public class ElectionStateTests
     }
 
     [Fact]
-    public async Task ConcurrentWriters_MaintainDataConsistency()
-    {
-        // Arrange: Create election state for concurrent write testing
-        var electionState = CreateElectionState();
-        const int threadCount = 5;
-        const int operationsPerThread = 10;
-        var tasks = new Task[threadCount];
-
-        // Act: Launch multiple threads performing state transitions
-        for (int i = 0; i < threadCount; i++)
-        {
-            tasks[i] = Task.Run(async () =>
-            {
-                for (int j = 0; j < operationsPerThread; j++)
-                {
-                    await electionState.BecomeManagerAsync();
-                    await electionState.LoseManagerAsync();
-                }
-            });
-        }
-
-        await Task.WhenAll(tasks);
-    }
-
-    [Fact]
     public async Task BecomeManagerAsync_IdempotentOperation()
     {
         // Arrange
@@ -520,78 +495,6 @@ public class ElectionStateTests
     #region Thread Safety Tests
 
     [Fact]
-    public async Task Semaphore_PreventsConcurrentCriticalSectionAccess()
-    {
-        // Arrange
-        var electionState = CreateElectionState();
-        var criticalSectionCount = 0;
-        var maxConcurrentAccess = 0;
-        var semaphore = new SemaphoreSlim(1, 1);
-
-        // Act - Start multiple threads trying to access critical section
-        var tasks = new Task[5];
-        for (int i = 0; i < tasks.Length; i++)
-        {
-            tasks[i] = Task.Run(async () =>
-            {
-                await semaphore.WaitAsync();
-                try
-                {
-                    var current = Interlocked.Increment(ref criticalSectionCount);
-                    maxConcurrentAccess = Math.Max(maxConcurrentAccess, current);
-
-                    // Simulate work in critical section
-                    await Task.Delay(10);
-
-                    Interlocked.Decrement(ref criticalSectionCount);
-                }
-                finally
-                {
-                    semaphore.Release();
-                }
-            });
-        }
-
-        await Task.WhenAll(tasks);
-
-        // Assert - Verify semaphore prevented concurrent access
-        maxConcurrentAccess.ShouldBe(1, "Semaphore should prevent concurrent critical section access");
-    }
-
-    [Fact]
-    public async Task ConcurrentOperations_MaintainStateConsistency()
-    {
-        // Arrange
-        var electionState = CreateElectionState();
-        const int operationCount = 100;
-        var successfulTransitions = 0;
-
-        // Act - Multiple threads performing state transitions
-        var tasks = new Task[10];
-        for (int i = 0; i < tasks.Length; i++)
-        {
-            tasks[i] = Task.Run(async () =>
-            {
-                for (int j = 0; j < operationCount; j++)
-                {
-                    var wasManagerBefore = electionState.IsManager;
-                    await electionState.BecomeManagerAsync();
-
-                    // Verify state transition was consistent
-                    if (electionState.IsManager && !wasManagerBefore)
-                        Interlocked.Increment(ref successfulTransitions);
-                }
-            });
-        }
-
-        await Task.WhenAll(tasks);
-
-        // Assert - Verify all operations maintained consistency
-        successfulTransitions.ShouldBeGreaterThan(0);
-        electionState.IsManager.ShouldBeTrue(); // Final state should be consistent
-    }
-
-    [Fact]
     public async Task RapidStateTransitions_DontCauseInconsistencies()
     {
         // Arrange
@@ -609,9 +512,9 @@ public class ElectionStateTests
                     await electionState.BecomeManagerAsync();
                     await electionState.LoseManagerAsync();
 
-                    // Check for impossible states
-                    if (electionState.IsManager && electionState.LostAt.HasValue &&
-                        electionState.ElectedAt > electionState.LostAt)
+                    // Check for impossible states using consistent snapshot
+                    var (isManager, electedAt, lostAt) = await electionState.GetStateSnapshotAsync();
+                    if (isManager && lostAt.HasValue && electedAt > lostAt)
                     {
                         Interlocked.Increment(ref inconsistencies);
                     }

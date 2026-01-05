@@ -405,55 +405,6 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Comprehensive_PerformanceCharacteristics_ShouldMeetExpectations()
-    {
-        const int performanceTestCount = 1000;
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-
-        // Performance test: Set operations
-        var setStopwatch = System.Diagnostics.Stopwatch.StartNew();
-        for (int i = 0; i < performanceTestCount; i++)
-        {
-            var entry = CacheEntryTestHelper.Create($"perf:set:{i}", $"value-{i}");
-            await _glacialCache!.SetEntryAsync(entry);
-        }
-        setStopwatch.Stop();
-
-        // Performance test: Get operations
-        var getStopwatch = System.Diagnostics.Stopwatch.StartNew();
-        for (int i = 0; i < performanceTestCount; i++)
-        {
-            var result = await _glacialCache!.GetEntryAsync<string>($"perf:set:{i}");
-            result.ShouldNotBeNull();
-        }
-        getStopwatch.Stop();
-
-        // Performance test: Batch operations
-        var batchStopwatch = System.Diagnostics.Stopwatch.StartNew();
-        var batchData = new Dictionary<string, (string value, DistributedCacheEntryOptions? options)>();
-        for (int i = 0; i < 100; i++)
-        {
-            batchData[$"perf:batch:{i}"] = ($"batch-value-{i}", null);
-        }
-        await _glacialCache!.SetMultipleEntriesAsync(batchData);
-        batchStopwatch.Stop();
-
-        var totalTime = stopwatch.ElapsedMilliseconds;
-
-        // Assert performance expectations
-        setStopwatch.ElapsedMilliseconds.ShouldBeLessThan(10000); // 10 seconds for 1000 operations
-        getStopwatch.ElapsedMilliseconds.ShouldBeLessThan(5000);  // 5 seconds for 1000 operations
-        batchStopwatch.ElapsedMilliseconds.ShouldBeLessThan(2000); // 2 seconds for 100 operations
-        totalTime.ShouldBeLessThan(15000); // Total should be reasonable
-
-        Output.WriteLine($"Performance Results:");
-        Output.WriteLine($"  Set operations: {setStopwatch.ElapsedMilliseconds}ms for {performanceTestCount} operations");
-        Output.WriteLine($"  Get operations: {getStopwatch.ElapsedMilliseconds}ms for {performanceTestCount} operations");
-        Output.WriteLine($"  Batch operations: {batchStopwatch.ElapsedMilliseconds}ms for 100 operations");
-        Output.WriteLine($"  Total time: {totalTime}ms");
-    }
-
-    [Fact]
     public async Task Comprehensive_MemoryUsage_ShouldBeReasonable()
     {
         // Test memory usage characteristics

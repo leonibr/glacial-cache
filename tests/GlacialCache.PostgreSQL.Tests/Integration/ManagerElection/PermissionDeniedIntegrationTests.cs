@@ -371,11 +371,12 @@ public class PermissionDeniedIntegrationTests : IntegrationTestBase
         var errorMessages = logMessages.Where(msg => msg.Contains("Advisory lock permission denied")).ToList();
         errorMessages.ShouldNotBeEmpty();
 
-        var permissionDeniedMessage = errorMessages.First();
+        // Select the manager-election specific message (not the schema creation warning)
+        var permissionDeniedMessage = errorMessages.First(msg => msg.Contains("for instance"));
         permissionDeniedMessage.ShouldContain("Automatic coordination disabled");
         permissionDeniedMessage.ShouldContain("GRANT EXECUTE ON FUNCTION pg_try_advisory_lock");
         permissionDeniedMessage.ShouldContain("CreateInfrastructure=false");
-        permissionDeniedMessage.ShouldContain("Manually coordinate schema creation");
+        permissionDeniedMessage.ShouldContain("Manually coordinate cleanup");
 
         Output.WriteLine($"✅ Clear error message logged: {permissionDeniedMessage}");
     }

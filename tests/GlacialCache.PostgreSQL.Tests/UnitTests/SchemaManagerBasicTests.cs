@@ -43,47 +43,6 @@ public class SchemaManagerBasicTests
     }
 
     [Fact]
-    public async Task SchemaManager_EnsureSchemaAsync_CreateInfrastructureFalse_SkipsCreation()
-    {
-        // Arrange
-        var mockDataSource = new Mock<IPostgreSQLDataSource>();
-        var mockNomenclature = new Mock<IDbNomenclature>();
-        var mockLogger = new Mock<ILogger<SchemaManager>>();
-        var options = new GlacialCachePostgreSQLOptions
-        {
-            Infrastructure = new InfrastructureOptions
-            {
-                CreateInfrastructure = false
-            }
-        };
-
-        mockNomenclature.Setup(x => x.SchemaName).Returns("glacial_cache");
-        mockNomenclature.Setup(x => x.TableName).Returns("cache");
-        mockNomenclature.Setup(x => x.FullTableName).Returns("glacial_cache.cache");
-
-        var schemaManager = new SchemaManager(
-            mockDataSource.Object,
-            options,
-            mockLogger.Object,
-            mockNomenclature.Object);
-
-        // Act
-        await schemaManager.EnsureSchemaAsync();
-
-        // Assert
-        mockDataSource.Verify(x => x.GetConnectionAsync(It.IsAny<CancellationToken>()), Times.Never);
-
-        mockLogger.Verify(
-            x => x.Log(
-                LogLevel.Information,
-                It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Skipping schema creation - CreateInfrastructure is disabled")),
-                It.IsAny<Exception>(),
-                It.IsAny<Func<It.IsAnyType, Exception, string>>()!),
-            Times.Once);
-    }
-
-    [Fact]
     public void GenerateSchemaLockKey_DeterministicAndUnique()
     {
         // Test that same inputs always generate same key

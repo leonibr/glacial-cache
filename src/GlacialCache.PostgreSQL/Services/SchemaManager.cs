@@ -53,7 +53,8 @@ public class SchemaManager : ISchemaManager
 
         if (!lockAcquired)
         {
-            _logger.LogInformation("Another instance is creating infrastructure, skipping schema creation");
+            _logger.LogInformation("Another instance is creating infrastructure, waiting for schema to be ready");
+            await WaitForSchemaReadyAsync(token);
             return;
         }
 
@@ -289,5 +290,72 @@ ON {_nomeclature.FullTableName} (next_expiration);";
         await command.ExecuteNonQueryAsync(token);
 
         _logger.LogInformation("Schema and tables created successfully");
+    }
+
+    /// <summary>
+    /// Waits for the schema to be ready by polling until the table is accessible.
+    /// Used when another instance is creating the infrastructure.
+    /// </summary>
+    private async Task WaitForSchemaReadyAsync(CancellationToken token)
+    {
+        var timeout = TimeSpan.FromSeconds(30);
+        var startTime = DateTime.UtcNow;
+        var delay = TimeSpan.FromMilliseconds(100);
+        const int maxDelay = 2000;
+        var attemptCount = 0;
+
+        _logger.LogDebug("Waiting for schema to be ready (timeout: {Timeout}s)", timeout.TotalSeconds);
+
+        while (DateTime.UtcNow - startTime < timeout)
+        {
+            attemptCount++;
+            
+            if (await IsSchemaReadyAsync(token))
+            {
+                _logger.LogInformation("Schema is ready after {AttemptCount} attempt(s) and {ElapsedMs}ms", 
+                    attemptCount, (DateTime.UtcNow - startTime).TotalMilliseconds);
+                return;
+            }
+
+            _logger.LogDebug("Schema not yet ready, attempt {AttemptCount}, waiting {DelayMs}ms before retry", 
+                attemptCount, delay.TotalMilliseconds);
+
+            await Task.Delay(delay, token);
+            
+            // Exponential backoff with max delay
+            delay = TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds * 1.5, maxDelay));
+        }
+
+        _logger.LogWarning(
+            "Timeout after {Timeout}s waiting for schema to be ready. " +
+            "Proceeding anyway - operations may fail until schema is created by another instance", 
+            timeout.TotalSeconds);
+    }
+
+    /// <summary>
+    /// Checks if the schema and table are ready by attempting to query the table.
+    /// </summary>
+    private async Task<bool> IsSchemaReadyAsync(CancellationToken token)
+    {
+        try
+        {
+            await using var connection = await _dataSource.GetConnectionAsync(token);
+            await using var command = new NpgsqlCommand(
+                $"SELECT 1 FROM {_nomeclature.FullTableName} LIMIT 0",
+                connection);
+            
+            await command.ExecuteNonQueryAsync(token);
+            return true;
+        }
+        catch (PostgresException ex) when (ex.SqlState == "42P01") // Relation does not exist
+        {
+            return false;
+        }
+        catch (Exception ex)
+        {
+            // Log at debug level to avoid noise - this is expected during schema creation
+            _logger.LogDebug(ex, "Error checking if schema is ready");
+            return false;
+        }
     }
 }

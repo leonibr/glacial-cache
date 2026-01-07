@@ -1,11 +1,11 @@
 using System.Text;
+using GlacialCache.PostgreSQL.Abstractions;
+using GlacialCache.PostgreSQL.Configuration;
+using GlacialCache.PostgreSQL.Serializers;
+using MemoryPack;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
-using GlacialCache.PostgreSQL.Configuration;
-using GlacialCache.PostgreSQL.Serializers;
-using GlacialCache.PostgreSQL.Abstractions;
-using MemoryPack;
 using Xunit;
 
 namespace GlacialCache.PostgreSQL.Tests.UnitTests;

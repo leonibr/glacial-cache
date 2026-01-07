@@ -1,15 +1,15 @@
+using GlacialCache.PostgreSQL.Abstractions;
+using GlacialCache.PostgreSQL.Configuration;
+using GlacialCache.PostgreSQL.Configuration.Maintenance;
+using GlacialCache.PostgreSQL.Configuration.Resilience;
+using GlacialCache.PostgreSQL.Models;
+using GlacialCache.PostgreSQL.Services;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using Npgsql;
 using Polly;
-using GlacialCache.PostgreSQL.Configuration;
-using GlacialCache.PostgreSQL.Abstractions;
-using GlacialCache.PostgreSQL.Models;
-using GlacialCache.PostgreSQL.Configuration.Resilience;
-using GlacialCache.PostgreSQL.Services;
-using GlacialCache.PostgreSQL.Configuration.Maintenance;
 
 namespace GlacialCache.PostgreSQL.Tests.UnitTests;
 

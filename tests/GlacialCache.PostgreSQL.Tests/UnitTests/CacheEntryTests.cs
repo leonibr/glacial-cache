@@ -1,6 +1,6 @@
+using GlacialCache.PostgreSQL.Configuration;
 using GlacialCache.PostgreSQL.Models;
 using GlacialCache.PostgreSQL.Tests.Shared;
-using GlacialCache.PostgreSQL.Configuration;
 using MemoryPack;
 
 namespace GlacialCache.PostgreSQL.Tests.UnitTests;

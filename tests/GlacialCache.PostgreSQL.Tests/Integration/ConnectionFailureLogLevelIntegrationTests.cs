@@ -1,15 +1,15 @@
+using GlacialCache.PostgreSQL.Abstractions;
+using GlacialCache.PostgreSQL.Configuration;
+using GlacialCache.PostgreSQL.Extensions;
+using GlacialCache.PostgreSQL.Services;
+using GlacialCache.PostgreSQL.Tests.Shared;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Testcontainers.PostgreSql;
-using GlacialCache.PostgreSQL.Extensions;
-using GlacialCache.PostgreSQL.Abstractions;
-using GlacialCache.PostgreSQL.Tests.Shared;
-using GlacialCache.PostgreSQL.Configuration;
-using GlacialCache.PostgreSQL.Services;
-using Xunit.Abstractions;
-using Npgsql;
 using Moq;
+using Npgsql;
+using Testcontainers.PostgreSql;
+using Xunit.Abstractions;
 
 namespace GlacialCache.PostgreSQL.Tests.Integration;
 
@@ -56,7 +56,8 @@ public class ConnectionFailureLogLevelIntegrationTests : IntegrationTestBase
         if (_serviceProvider is IDisposable disposable)
         {
             try
-            {                
+            {
+
                 disposable.Dispose();
             }
             catch (Exception ex)

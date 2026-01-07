@@ -1,17 +1,17 @@
+using System.Diagnostics;
+using GlacialCache.PostgreSQL.Abstractions;
+using GlacialCache.PostgreSQL.Configuration;
+using GlacialCache.PostgreSQL.Extensions;
+using GlacialCache.PostgreSQL.Serializers;
+using GlacialCache.PostgreSQL.Services;
+using GlacialCache.PostgreSQL.Tests.Shared;
 using MemoryPack;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Testcontainers.PostgreSql;
-using GlacialCache.PostgreSQL.Extensions;
-using GlacialCache.PostgreSQL.Abstractions;
-using GlacialCache.PostgreSQL.Tests.Shared;
-using GlacialCache.PostgreSQL.Configuration;
-using GlacialCache.PostgreSQL.Services;
-using GlacialCache.PostgreSQL.Serializers;
-using Xunit.Abstractions;
-using System.Diagnostics;
 using Npgsql;
+using Testcontainers.PostgreSql;
+using Xunit.Abstractions;
 
 namespace GlacialCache.PostgreSQL.Tests.Integration;
 

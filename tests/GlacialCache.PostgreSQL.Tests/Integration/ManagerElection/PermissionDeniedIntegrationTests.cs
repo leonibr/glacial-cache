@@ -1,17 +1,17 @@
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Hosting;
 using System.Linq;
-using Testcontainers.PostgreSql;
 using GlacialCache.PostgreSQL.Abstractions;
 using GlacialCache.PostgreSQL.Configuration;
 using GlacialCache.PostgreSQL.Configuration.Infrastructure;
+using GlacialCache.PostgreSQL.Configuration.Maintenance;
 using GlacialCache.PostgreSQL.Extensions;
 using GlacialCache.PostgreSQL.Tests.Shared;
-using Xunit.Abstractions;
-using Npgsql;
 using Microsoft.Extensions.Caching.Distributed;
-using GlacialCache.PostgreSQL.Configuration.Maintenance;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Npgsql;
+using Testcontainers.PostgreSql;
+using Xunit.Abstractions;
 
 namespace GlacialCache.PostgreSQL.Tests.Integration.ManagerElection;
 

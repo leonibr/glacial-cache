@@ -1,7 +1,7 @@
-using GlacialCache.PostgreSQL.Services;
 using GlacialCache.PostgreSQL.Configuration;
-using Microsoft.Extensions.Logging;
 using GlacialCache.PostgreSQL.Configuration.Maintenance;
+using GlacialCache.PostgreSQL.Services;
+using Microsoft.Extensions.Logging;
 
 namespace GlacialCache.PostgreSQL.Tests.UnitTests;
 

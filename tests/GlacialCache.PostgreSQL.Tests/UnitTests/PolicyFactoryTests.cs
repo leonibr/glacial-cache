@@ -1,11 +1,11 @@
-using Microsoft.Extensions.Logging;
-using Moq;
-using Polly.CircuitBreaker;
-using Polly.Timeout;
-using Npgsql;
 using GlacialCache.PostgreSQL.Configuration;
 using GlacialCache.PostgreSQL.Configuration.Resilience;
 using GlacialCache.PostgreSQL.Services;
+using Microsoft.Extensions.Logging;
+using Moq;
+using Npgsql;
+using Polly.CircuitBreaker;
+using Polly.Timeout;
 
 namespace GlacialCache.PostgreSQL.Tests.UnitTests;
 

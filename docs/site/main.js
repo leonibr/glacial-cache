@@ -8,7 +8,7 @@ const documentation = [
     title: 'Getting Started',
     description:
       'Quick start guide with prerequisites, installation, and your first cache operations in ASP.NET Core.',
-    link: 'https://github.com/leonibr/glacial-cache/blob/main/docs/getting-started.md',
+    link: 'https://github.com/leonibr/glacial-cache/blob/master/docs/getting-started.md',
     excerpt:
       'Install GlacialCache.PostgreSQL via NuGet, register it in Program.cs, and start using IDistributedCache for durable, cross-instance caching.',
   },
@@ -17,7 +17,7 @@ const documentation = [
     title: 'Core Concepts',
     description:
       'Understanding the data model, expiration behavior, cleanup strategy, and how GlacialCache compares to other solutions.',
-    link: 'https://github.com/leonibr/glacial-cache/blob/main/docs/concepts.md',
+    link: 'https://github.com/leonibr/glacial-cache/blob/master/docs/concepts.md',
     excerpt:
       'Learn about absolute and sliding expiration, PostgreSQL schema design, automatic cleanup, and when to choose GlacialCache.',
   },
@@ -26,7 +26,7 @@ const documentation = [
     title: 'Configuration',
     description:
       'Complete reference for GlacialCachePostgreSQLOptions including connection, cache, maintenance, resilience, and Azure settings.',
-    link: 'https://github.com/leonibr/glacial-cache/blob/main/docs/configuration.md',
+    link: 'https://github.com/leonibr/glacial-cache/blob/master/docs/configuration.md',
     excerpt:
       'Configure connection pooling, expiration defaults, cleanup intervals, retry policies, circuit breakers, and Azure Managed Identity.',
   },
@@ -35,7 +35,7 @@ const documentation = [
     title: 'Architecture',
     description:
       'System design internals covering components, request flow, background maintenance, and manager election.',
-    link: 'https://github.com/leonibr/glacial-cache/blob/main/docs/architecture.md',
+    link: 'https://github.com/leonibr/glacial-cache/blob/master/docs/architecture.md',
     excerpt:
       'Deep dive into how GlacialCache handles connection pooling, resilience patterns, background cleanup, and multi-instance coordination.',
   },
@@ -44,7 +44,7 @@ const documentation = [
     title: 'Troubleshooting',
     description:
       'Common issues and solutions for connection problems, schema issues, performance tuning, and Azure diagnostics.',
-    link: 'https://github.com/leonibr/glacial-cache/blob/main/docs/troubleshooting.md',
+    link: 'https://github.com/leonibr/glacial-cache/blob/master/docs/troubleshooting.md',
     excerpt:
       'Diagnose and fix connectivity issues, permission errors, cleanup problems, locking conflicts, and Azure Managed Identity challenges.',
   },
@@ -53,7 +53,7 @@ const documentation = [
     title: 'Examples',
     description:
       'Runnable code samples showing basic usage, advanced patterns, MemoryPack serialization, and Web API integration.',
-    link: 'https://github.com/leonibr/glacial-cache/tree/main/examples',
+    link: 'https://github.com/leonibr/glacial-cache/tree/master/examples',
     excerpt:
       'Explore working examples including console apps, ASP.NET Core Web APIs, custom serializers, and Docker Compose setups.',
   },

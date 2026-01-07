@@ -284,6 +284,80 @@ var combinedOptions = new DistributedCacheEntryOptions
 };
 ```
 
+### Typed Cache Operations
+
+GlacialCache provides strongly-typed operations for type safety and automatic serialization:
+
+```csharp
+public class CatalogService
+{
+    private readonly IGlacialCache _cache;
+
+    public CatalogService(IGlacialCache cache)
+    {
+        _cache = cache;
+    }
+
+    public async Task<Product?> GetProductAsync(int id)
+    {
+        var key = $"product:{id}";
+
+        // Strongly-typed retrieval with rich metadata
+        var entry = await _cache.GetEntryAsync<Product>(key);
+
+        if (entry != null)
+        {
+            _logger.LogInformation(
+                "Cache hit for {Key}. Size: {Size} bytes, Type: {Type}",
+                entry.Key,
+                entry.SizeInBytes,
+                entry.BaseType);
+
+            return entry.Value;
+        }
+
+        // Fetch and cache
+        var product = await _database.GetProductAsync(id);
+        if (product == null) return null;
+
+        await _cache.SetEntryAsync(key, product, new()
+        {
+            AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1),
+            SlidingExpiration = TimeSpan.FromMinutes(15)
+        });
+
+        return product;
+    }
+
+    public async Task<Dictionary<int, Product>> GetProductBatchAsync(int[] ids)
+    {
+        var keys = ids.Select(id => $"product:{id}");
+
+        // Batch typed retrieval - single database round-trip
+        var entries = await _cache.GetMultipleEntriesAsync<Product>(keys);
+
+        return entries
+            .Where(kvp => kvp.Value != null)
+            .ToDictionary(
+                kvp => int.Parse(kvp.Key.Split(':')[1]),
+                kvp => kvp.Value!.Value);
+    }
+}
+```
+
+### Type Safety Benefits
+
+```csharp
+// Type mismatch protection
+await cache.SetEntryAsync("key1", new Product { Id = 1 });
+
+// Returns null - type mismatch detected
+var order = await cache.GetEntryAsync<Order>("key1");
+
+// Returns Product - correct type
+var product = await cache.GetEntryAsync<Product>("key1");
+```
+
 ## Logging
 
 GlacialCache uses `Microsoft.Extensions.Logging` for comprehensive logging:
@@ -363,16 +437,18 @@ Use Azure App Configuration for centralized cache management across microservice
 
 ```csharp
 // Program.cs
-builder.Configuration.AddAzureAppConfiguration(options =>
-{
-    options.Connect("Endpoint=https://my-app-config.azconfig.io;...");
-    options.ConfigureRefresh(refreshOptions =>
-    {
-        refreshOptions.Register("GlacialCache", refreshAll: true);
-    });
-});
+// Install: Microsoft.Extensions.Configuration.AzureAppConfiguration
+// Add Azure App Configuration provider
+// Refer to Azure App Configuration documentation for exact API
+builder.Configuration.AddAzureAppConfiguration(/* connection string or options */);
 
-// Configuration in Azure App Configuration
+// Configure refresh for GlacialCache section
+// The exact API depends on your package version
+```
+
+**Configuration in Azure App Configuration**:
+
+```json
 {
   "GlacialCache": {
     "Cache": {
@@ -387,6 +463,8 @@ builder.Configuration.AddAzureAppConfiguration(options =>
   }
 }
 ```
+
+**Note**: Refer to the [Azure App Configuration documentation](https://learn.microsoft.com/azure/azure-app-configuration/) for the current API and setup instructions.
 
 ### Security Configuration
 
@@ -413,6 +491,37 @@ Reloadable configuration works with any .NET configuration provider:
 - **Key Vault**: Secure credential management
 - **User Secrets**: Development-time secrets
 
+### How It Works: ObservableProperty Pattern
+
+GlacialCache uses the `ObservableProperty<T>` pattern for internal change propagation:
+
+```csharp
+// Internal implementation (simplified for illustration)
+public class CacheOptions
+{
+    private ObservableProperty<string> _tableName;
+
+    public string TableName
+    {
+        get => _tableName.Value;
+        set => _tableName.Value = value;
+    }
+
+    // When external config changes via IOptionsMonitor
+    internal void SyncFromExternalChanges(CacheOptions newOptions, ILogger logger)
+    {
+        _tableName.Value = newOptions.TableName; // Triggers PropertyChanged event
+    }
+}
+```
+
+**Key Benefits**:
+
+- **Automatic propagation**: Changes flow from `IOptionsMonitor` → `ObservableProperty` → dependent services
+- **Resource recreation**: Services subscribe to property changes and recreate resources (connections, SQL queries)
+- **Thread-safe**: All updates are synchronized
+- **Logging**: Every change is logged for observability
+
 ### Monitoring Configuration Changes
 
 Configuration changes are logged at Information level:
@@ -426,6 +535,44 @@ info: GlacialCache.PostgreSQL[0]
 ```
 
 **Security Note:** Connection strings are automatically masked in logs to prevent exposure of sensitive information like passwords and tokens.
+
+### Troubleshooting Configuration Reloading
+
+**Configuration not reloading?**
+
+1. **Check your configuration provider supports reloading**:
+
+   ```csharp
+   // appsettings.json - enable reloadOnChange
+   builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+   ```
+
+2. **Verify IOptionsMonitor is being used** (not IOptions):
+
+   ```csharp
+   // ✅ Correct - supports reloading
+   services.Configure<GlacialCachePostgreSQLOptions>(config.GetSection("GlacialCache"));
+
+   // ❌ Wrong - snapshot only, no reloading
+   services.Configure<GlacialCachePostgreSQLOptions>(options => { /* ... */ });
+   ```
+
+3. **Check logs for configuration change events**:
+
+   ```json
+   {
+     "Logging": {
+       "LogLevel": {
+         "GlacialCache.PostgreSQL": "Information"
+       }
+     }
+   }
+   ```
+
+4. **Non-reloadable properties**: Some properties require restart:
+   - `Infrastructure.CreateInfrastructure`
+   - `Infrastructure.EnableManagerElection`
+   - `Cache.Serializer`
 
 ## Testing
 

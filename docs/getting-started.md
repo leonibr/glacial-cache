@@ -186,3 +186,113 @@ Then exercise the cache:
 - See `docs/concepts.md` for expiration behavior and data model details.
 - See `docs/configuration.md` for all available configuration options.
 - See `docs/troubleshooting.md` if you hit connectivity or performance issues.
+
+---
+
+## Testing with GlacialCache
+
+### Custom TimeProvider for Tests
+
+GlacialCache uses `TimeProvider` for all time-sensitive operations, making it easy to test expiration behavior:
+
+```csharp
+[Fact]
+public async Task TestExpirationBehavior()
+{
+    var fakeTime = new FakeTimeProvider(new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero));
+    
+    var services = new ServiceCollection();
+    services.AddSingleton<TimeProvider>(fakeTime);
+    services.AddGlacialCachePostgreSQL(connectionString);
+    
+    var provider = services.BuildServiceProvider();
+    var cache = provider.GetRequiredService<IDistributedCache>();
+    
+    // Set entry that expires in 1 hour
+    await cache.SetStringAsync("key", "value", new()
+    {
+        AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1)
+    });
+    
+    // Still valid
+    var result1 = await cache.GetStringAsync("key");
+    Assert.NotNull(result1);
+    
+    // Advance time by 61 minutes
+    fakeTime.Advance(TimeSpan.FromMinutes(61));
+    
+    // Now expired
+    var result2 = await cache.GetStringAsync("key");
+    Assert.Null(result2);
+}
+```
+
+### Integration Testing
+
+Use Testcontainers for integration tests with real PostgreSQL:
+
+```csharp
+public class CacheIntegrationTests : IAsyncLifetime
+{
+    private PostgreSqlContainer _postgres = null!;
+    
+    public async Task InitializeAsync()
+    {
+        _postgres = new PostgreSqlBuilder()
+            .WithImage("postgres:17-alpine")
+            .Build();
+        await _postgres.StartAsync();
+    }
+    
+    [Fact]
+    public async Task RealDatabaseTest()
+    {
+        var services = new ServiceCollection();
+        services.AddGlacialCachePostgreSQL(_postgres.GetConnectionString());
+        
+        var provider = services.BuildServiceProvider();
+        var cache = provider.GetRequiredService<IDistributedCache>();
+        
+        // Test against real PostgreSQL
+        await cache.SetStringAsync("test", "value");
+        var result = await cache.GetStringAsync("test");
+        
+        Assert.Equal("value", result);
+    }
+    
+    public async Task DisposeAsync() => await _postgres.DisposeAsync();
+}
+```
+
+### Testing Typed Operations
+
+Test strongly-typed cache operations with type safety:
+
+```csharp
+[Fact]
+public async Task TestTypedCacheOperations()
+{
+    var services = new ServiceCollection();
+    services.AddGlacialCachePostgreSQL(connectionString);
+    
+    var provider = services.BuildServiceProvider();
+    var cache = provider.GetRequiredService<IGlacialCache>();
+    
+    // Store a Product
+    var product = new Product { Id = 1, Name = "Widget", Price = 9.99m };
+    await cache.SetEntryAsync("product:1", product, new()
+    {
+        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10)
+    });
+    
+    // Retrieve with correct type
+    var entry = await cache.GetEntryAsync<Product>("product:1");
+    Assert.NotNull(entry);
+    Assert.Equal("Widget", entry.Value.Name);
+    Assert.Equal(typeof(Product).FullName, entry.BaseType);
+    
+    // Type mismatch returns null
+    var wrongType = await cache.GetEntryAsync<Order>("product:1");
+    Assert.Null(wrongType);
+}
+```

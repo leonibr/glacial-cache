@@ -108,6 +108,30 @@ Found an issue or want to improve the docs? Contributions are welcome!
 4. Update cross-references when adding new sections
 5. Submit pull requests with clear descriptions
 
+## Roadmap & Planned Features
+
+### Azure Managed Identity Support
+
+**Status**: Planned for future release
+
+Azure Managed Identity integration is planned to leverage the existing reloadable configuration system for automatic token refresh. This will enable passwordless authentication to Azure Database for PostgreSQL without requiring application restarts when tokens expire.
+
+**Key Features**:
+- Automatic token refresh using `Azure.Identity`
+- Integration with existing `ObservableProperty<T>` infrastructure
+- Support for both system-assigned and user-assigned identities
+- Simple `AddGlacialCachePostgreSQLWithAzureManagedIdentity()` extension method
+
+For updates on this feature, follow our [GitHub repository](https://github.com/leonibr/glacial-cache).
+
+### Other Planned Features
+
+- ASP.NET Core health check integration
+- Metrics collection (Prometheus, OpenTelemetry)
+- Additional serialization providers
+- Distributed locking primitives
+- Tag-based cache invalidation
+
 ## Feedback
 
 Have questions or suggestions about the documentation? Please:

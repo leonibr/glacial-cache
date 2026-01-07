@@ -134,6 +134,8 @@ psql -U postgres -d GlacialCache -f examples/GlacialCache.Example/init.sql
 | --------------------- | ----- | ---------- | ---------- | ------- |
 | PostgreSQL Standard   | ✅    | ✅         | ✅         | ✅      |
 | Batch Operations      | ✅    | ✅         | ✅         | ✅      |
+| Typed Operations      | ❌    | ✅         | ✅         | ❌      |
+| Type Safety           | ❌    | ✅         | ✅         | ❌      |
 | RESTful API           | ❌    | ❌         | ❌         | ✅      |
 | High Performance      | ❌    | ❌         | ✅         | ❌      |
 | Rich Metadata         | ❌    | ✅         | ❌         | ❌      |

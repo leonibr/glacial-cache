@@ -55,9 +55,16 @@
   - 🔐 Configurable timeouts, pooling, and resilience
 
 - **Developer experience**
+
   - 🧩 Simple registration via `AddGlacialCachePostgreSQL(...)`
+  - 🔷 Strongly-typed generic operations with `CacheEntry<T>`
   - 🧪 Ready-to-run examples and integration tests
   - 🔧 Pluggable serializers (MemoryPack or JSON bytes)
+
+- **Runtime flexibility**
+  - 🔄 Reloadable configuration for zero-downtime updates
+  - 🔄 Database failover support through dynamic connection strings
+  - 🔄 Credential rotation without restarts
 
 ---
 
@@ -208,6 +215,39 @@ Issues and pull requests are welcome.
 - **Before contributing**: run the tests from `tests/GlacialCache.PostgreSQL.Tests` and keep documentation in `docs/` up to date with behavioral changes.
 - **How to contribute**: fork the repo, create a feature branch, and open a PR with a clear description and rationale.
 - **Support the project**: if GlacialCache helps you, consider starring the repository and sharing it with your team.
+
+---
+
+### Roadmap & Planned Features
+
+GlacialCache is actively developed with several features planned for future releases:
+
+#### Azure Managed Identity Support
+
+**Status**: Planned  
+**Vision**: Seamless Azure Managed Identity integration leveraging the existing reloadable configuration system.
+
+The planned implementation will:
+
+- Use the existing `ObservableProperty<T>` infrastructure for automatic token refresh
+- Integrate with `Azure.Identity` for passwordless authentication to Azure Database for PostgreSQL
+- Automatically update connection strings with refreshed tokens via the reloadable configuration system
+- Support both system-assigned and user-assigned managed identities
+- Provide a simple `AddGlacialCachePostgreSQLWithAzureManagedIdentity()` extension method
+
+This feature will enable zero-downtime credential management in Azure environments without adding new infrastructure—just leveraging what already exists.
+
+**Why wait?** We want to ensure the reloadable configuration system is battle-tested in production before building on top of it.
+
+#### Additional Planned Features
+
+- Health check integration with ASP.NET Core health checks
+- Metrics collection and export (Prometheus, OpenTelemetry)
+- Additional serialization providers (MessagePack, Protobuf)
+- Distributed locking primitives for coordination scenarios
+- Tag-based cache invalidation
+
+Have a feature request? [Open an issue](https://github.com/leonibr/glacial-cache/issues) or start a [discussion](https://github.com/leonibr/glacial-cache/discussions)!
 
 ---
 

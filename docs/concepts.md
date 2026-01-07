@@ -9,7 +9,7 @@ This page explains the data model, expiration behavior, and cleanup strategy, an
 By default GlacialCache creates a table similar to:
 
 ```sql
-CREATE TABLE public.glacial_cache_entries (
+CREATE TABLE public.glacial_cache (
     key VARCHAR(900) PRIMARY KEY,
     value BYTEA NOT NULL,
     absolute_expiration TIMESTAMPTZ,
@@ -19,12 +19,12 @@ CREATE TABLE public.glacial_cache_entries (
     value_size INTEGER GENERATED ALWAYS AS (OCTET_LENGTH(value)) STORED
 );
 
-CREATE INDEX idx_glacial_cache_entries_absolute_expiration
-ON public.glacial_cache_entries (absolute_expiration)
+CREATE INDEX idx_glacial_cache_absolute_expiration
+ON public.glacial_cache (absolute_expiration)
 WHERE absolute_expiration IS NOT NULL;
 
-CREATE INDEX idx_glacial_cache_entries_next_expiration
-ON public.glacial_cache_entries (next_expiration);
+CREATE INDEX idx_glacial_cache_next_expiration
+ON public.glacial_cache (next_expiration);
 ```
 
 - **`key`**: cache key (up to 900 characters). This is the same key you pass to `IDistributedCache`.
@@ -159,3 +159,135 @@ Use Redis when:
 - You need **very high throughput / ultra-low latency** cache traffic.
 - Your cache workload would overload the primary database.
 - You want advanced cache patterns (pub/sub, streams, Lua scripts, etc.).
+
+## Typed Cache Operations
+
+GlacialCache provides strongly-typed cache operations through generic methods, eliminating manual serialization and providing compile-time type safety.
+
+### CacheEntry<T> Model
+
+The `CacheEntry<T>` record provides rich metadata about cached values:
+
+```csharp
+public sealed record CacheEntry<T>
+{
+    public string Key { get; init; }
+    public T Value { get; init; }
+    public DateTimeOffset? AbsoluteExpiration { get; init; }
+    public TimeSpan? SlidingExpiration { get; init; }
+
+    // Metadata (injected by framework)
+    public ReadOnlyMemory<byte> SerializedData { get; init; }
+    public string BaseType { get; init; }  // Fully qualified type name
+    public int SizeInBytes { get; init; }  // Serialized size
+}
+```
+
+### Type-Safe Operations
+
+Cast `IDistributedCache` to `IGlacialCache` to access typed methods:
+
+```csharp
+public class ProductService
+{
+    private readonly IGlacialCache _cache;
+
+    public ProductService(IGlacialCache cache)
+    {
+        _cache = cache;
+    }
+
+    public async Task<Product?> GetProductAsync(int id)
+    {
+        var key = $"product:{id}";
+
+        // Strongly-typed retrieval - no manual deserialization
+        var entry = await _cache.GetEntryAsync<Product>(key);
+
+        if (entry != null)
+        {
+            Console.WriteLine($"Cache hit! Size: {entry.SizeInBytes} bytes");
+            Console.WriteLine($"Type: {entry.BaseType}");
+            return entry.Value;
+        }
+
+        // Fetch from database
+        var product = await _repository.GetProductAsync(id);
+        if (product == null) return null;
+
+        // Strongly-typed storage - automatic serialization
+        await _cache.SetEntryAsync(key, product, new DistributedCacheEntryOptions
+        {
+            AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1)
+        });
+
+        return product;
+    }
+}
+```
+
+### Type Safety and BaseType Tracking
+
+GlacialCache tracks the original type of cached values:
+
+```csharp
+// Store a Product
+await cache.SetEntryAsync("item:1", new Product { Id = 1, Name = "Widget" });
+
+// Attempting to retrieve as wrong type returns null (type mismatch)
+var order = await cache.GetEntryAsync<Order>("item:1"); // Returns null
+
+// Correct type retrieval succeeds
+var product = await cache.GetEntryAsync<Product>("item:1"); // Returns Product
+```
+
+The `BaseType` field stores the fully qualified type name, preventing accidental type mismatches.
+
+### Batch Typed Operations
+
+Retrieve and store multiple typed values efficiently:
+
+```csharp
+// Batch typed retrieval
+var keys = new[] { "product:1", "product:2", "product:3" };
+var products = await cache.GetMultipleEntriesAsync<Product>(keys);
+
+foreach (var kvp in products)
+{
+    if (kvp.Value != null)
+    {
+        Console.WriteLine($"{kvp.Key}: {kvp.Value.Value.Name}");
+    }
+}
+
+// Batch typed storage
+var entries = new Dictionary<string, (Product value, DistributedCacheEntryOptions? options)>
+{
+    ["product:1"] = (product1, new() { SlidingExpiration = TimeSpan.FromMinutes(30) }),
+    ["product:2"] = (product2, new() { SlidingExpiration = TimeSpan.FromMinutes(30) }),
+    ["product:3"] = (product3, new() { SlidingExpiration = TimeSpan.FromMinutes(30) })
+};
+
+await cache.SetMultipleEntriesAsync(entries);
+```
+
+### Serialization
+
+Typed operations use the configured serializer (`MemoryPack` or `JsonBytes`):
+
+- **MemoryPack** (default): High-performance binary serialization, smallest size
+- **JsonBytes**: Human-readable, better debugging, cross-platform compatibility
+
+Both serializers optimize for common types:
+
+- **Strings**: Direct UTF-8 encoding (no serialization overhead)
+- **Byte arrays**: Pass-through without modification
+- **Complex objects**: Use configured serializer
+
+### Benefits
+
+✅ **Compile-time safety**: Type mismatches caught at compile time  
+✅ **No manual serialization**: Framework handles it automatically  
+✅ **Rich metadata**: Access to size, type, and expiration info  
+✅ **Performance**: Optimized for strings and byte arrays  
+✅ **Type tracking**: Prevents accidental type confusion

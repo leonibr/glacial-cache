@@ -370,29 +370,65 @@ ON {_nomeclature.FullTableName} (next_expiration);";
     }
 
     /// <summary>
-    /// Checks if the schema and table are ready by attempting to query the table.
+    /// Checks if the schema and table are ready by first verifying table existence
+    /// and then testing accessibility.
     /// </summary>
     private async Task<bool> IsSchemaReadyAsync(CancellationToken token)
     {
-        try
-        {
-            await using var connection = await _dataSource.GetConnectionAsync(token);
-            await using var command = new NpgsqlCommand(
-                $"SELECT 1 FROM {_nomeclature.FullTableName} LIMIT 0",
-                connection);
+        const int maxRetries = 3;
+        var retryDelay = TimeSpan.FromMilliseconds(50);
 
-            await command.ExecuteNonQueryAsync(token);
-            return true;
-        }
-        catch (PostgresException ex) when (ex.SqlState == "42P01") // Relation does not exist
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
         {
-            return false;
+            try
+            {
+                await using var connection = await _dataSource.GetConnectionAsync(token);
+
+                // Step 1: Check if table exists using information_schema (more reliable)
+                await using var existsCommand = new NpgsqlCommand(
+                    @"SELECT EXISTS (
+                        SELECT 1 FROM information_schema.tables
+                        WHERE table_schema = @schema AND table_name = @table
+                    )",
+                    connection);
+
+                existsCommand.Parameters.AddWithValue("@schema", _nomeclature.SchemaName);
+                existsCommand.Parameters.AddWithValue("@table", _nomeclature.TableName);
+
+                var tableExists = (bool)await existsCommand.ExecuteScalarAsync(token);
+                if (!tableExists)
+                {
+                    return false; // Table doesn't exist yet
+                }
+
+                // Step 2: Verify table is accessible with a simple query
+                await using var accessCommand = new NpgsqlCommand(
+                    $"SELECT 1 FROM {_nomeclature.FullTableName} LIMIT 0",
+                    connection);
+
+                await accessCommand.ExecuteNonQueryAsync(token);
+                return true; // Table exists and is accessible
+            }
+            catch (PostgresException ex) when (ex.SqlState == "42P01") // Relation does not exist
+            {
+                return false; // Table doesn't exist
+            }
+            catch (Exception ex)
+            {
+                // For transient errors, retry up to maxRetries times
+                if (attempt == maxRetries)
+                {
+                    // Log at debug level to avoid noise - this is expected during schema creation
+                    _logger.LogDebug(ex, "Error checking if schema is ready after {AttemptCount} attempts", maxRetries);
+                    return false;
+                }
+
+                // Wait before retrying
+                await Task.Delay(retryDelay, token);
+                retryDelay = TimeSpan.FromMilliseconds(retryDelay.TotalMilliseconds * 2); // Exponential backoff
+            }
         }
-        catch (Exception ex)
-        {
-            // Log at debug level to avoid noise - this is expected during schema creation
-            _logger.LogDebug(ex, "Error checking if schema is ready");
-            return false;
-        }
+
+        return false; // Should never reach here, but compiler requires it
     }
 }

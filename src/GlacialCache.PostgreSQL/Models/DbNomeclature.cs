@@ -1,10 +1,10 @@
+using System.ComponentModel;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.ComponentModel;
 
 namespace GlacialCache.PostgreSQL.Models;
-using Configuration;
 using Abstractions;
+using Configuration;
 using Extensions;
 
 internal sealed class DbNomenclature : IDbNomenclature, IDisposable
@@ -14,8 +14,19 @@ internal sealed class DbNomenclature : IDbNomenclature, IDisposable
     private readonly IDisposable? _optionsChangeToken;
     private GlacialCachePostgreSQLOptions _options;
 
+    /// <summary>
+    /// The table name (lowercase, validated PostgreSQL identifier).
+    /// </summary>
     public string TableName { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// The fully qualified table name (schema.table).
+    /// </summary>
     public string FullTableName { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// The schema name (lowercase, validated PostgreSQL identifier).
+    /// </summary>
     public string SchemaName { get; private set; } = string.Empty;
 
     internal DbNomenclature(IOptionsMonitor<GlacialCachePostgreSQLOptions> options, ILogger<DbNomenclature> logger)
@@ -78,9 +89,9 @@ internal sealed class DbNomenclature : IDbNomenclature, IDisposable
 
     private void UpdateFromObservableProperties()
     {
-        // Update from observable properties (the new values)
-        TableName = _options.Cache.TableNameObservable.Value.ToLowerInvariant();
-        SchemaName = _options.Cache.SchemaNameObservable.Value.ToLowerInvariant();
+        // CacheOptions already validates and lowercases the values
+        TableName = _options.Cache.TableNameObservable.Value;
+        SchemaName = _options.Cache.SchemaNameObservable.Value;
         FullTableName = $"{SchemaName}.{TableName}";
     }
 
@@ -92,8 +103,9 @@ internal sealed class DbNomenclature : IDbNomenclature, IDisposable
 
     private void UpdateProperties(GlacialCachePostgreSQLOptions options)
     {
-        TableName = options.Cache.TableName.ToLowerInvariant();
-        SchemaName = options.Cache.SchemaName.ToLowerInvariant();
+        // CacheOptions already validates and lowercases the values
+        TableName = options.Cache.TableName;
+        SchemaName = options.Cache.SchemaName;
         FullTableName = $"{SchemaName}.{TableName}";
     }
 

@@ -1,12 +1,12 @@
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Npgsql;
+using GlacialCache.Logging;
 using GlacialCache.PostgreSQL.Abstractions;
 using GlacialCache.PostgreSQL.Configuration;
 using GlacialCache.PostgreSQL.Configuration.Infrastructure;
 using GlacialCache.PostgreSQL.Models;
-using GlacialCache.Logging;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Npgsql;
 
 namespace GlacialCache.PostgreSQL.Services;
 
@@ -202,13 +202,14 @@ internal class ElectionBackgroundService : BackgroundService
 
     private async Task<bool> TryAcquireAdvisoryLockAsync(CancellationToken cancellationToken)
     {
+        NpgsqlConnection? connection = null;
         try
         {
-            _lockConnection = await _dataSource.GetConnectionAsync(cancellationToken);
+            connection = await _dataSource.GetConnectionAsync(cancellationToken);
 
             // Use PostgreSQL advisory lock with timeout
             await using var command = new NpgsqlCommand(
-                "SELECT pg_try_advisory_lock(@lockKey)", _lockConnection);
+                "SELECT pg_try_advisory_lock(@lockKey)", connection);
             command.Parameters.AddWithValue("@lockKey", _lockOptions.AdvisoryLockKey);
             command.CommandTimeout = (int)_lockOptions.LockTimeout.TotalSeconds;
 
@@ -217,14 +218,15 @@ internal class ElectionBackgroundService : BackgroundService
 
             if (acquired)
             {
+                // Transfer ownership to _lockConnection only on success
+                _lockConnection = connection;
+                connection = null; // Prevent disposal in finally block
                 _logger.LogElectionAdvisoryLockAcquired(_electionState.InstanceId);
-            }
-            else
-            {
-                _logger.LogElectionAdvisoryLockFailed(_electionState.InstanceId);
+                return true;
             }
 
-            return acquired;
+            _logger.LogElectionAdvisoryLockFailed(_electionState.InstanceId);
+            return false;
         }
         catch (PostgresException ex) when (ex.SqlState == "42501") // Insufficient privilege
         {
@@ -246,6 +248,11 @@ internal class ElectionBackgroundService : BackgroundService
         {
             _logger.LogElectionServiceError(_electionState.InstanceId, ex);
             return false;
+        }
+        finally
+        {
+            // Dispose connection if not transferred to _lockConnection (i.e., lock not acquired)
+            connection?.Dispose();
         }
     }
 

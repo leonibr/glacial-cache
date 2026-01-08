@@ -13,7 +13,7 @@ using Logging;
 /// <summary>
 /// Simple background service for periodic cleanup of expired cache entries.
 /// </summary>
-internal class CleanupBackgroundService : BackgroundService, ICleanupBackgroundService
+internal class CleanupBackgroundService : BackgroundService, ICleanupBackgroundService, IAsyncDisposable
 {
     private readonly GlacialCachePostgreSQLOptions _options;
     private readonly ILogger<CleanupBackgroundService> _logger;
@@ -143,5 +143,33 @@ internal class CleanupBackgroundService : BackgroundService, ICleanupBackgroundS
         {
             base.Dispose();
         }
+    }
+
+    /// <summary>
+    /// Asynchronously disposes the cleanup background service, ensuring graceful shutdown.
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
+        try
+        {
+            // Stop the service gracefully first
+            await StopAsync(CancellationToken.None).ConfigureAwait(false);
+
+            _cleanupTimer?.Dispose();
+            _logger?.LogCleanupServiceDisposed();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Error async disposing CleanupBackgroundService");
+        }
+
+        GC.SuppressFinalize(this);
     }
 }

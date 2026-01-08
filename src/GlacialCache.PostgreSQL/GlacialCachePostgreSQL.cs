@@ -1,19 +1,19 @@
+using MemoryPack;
 using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Npgsql;
-using Microsoft.Extensions.DependencyInjection;
 using Polly;
-using MemoryPack;
 
 namespace GlacialCache.PostgreSQL;
+using Abstractions;
+using Configuration;
+using Extensions;
+using Logging;
 using Models;
 using Models.CommandParameters;
 using Services;
-using Abstractions;
-using Configuration;
-using Logging;
-using Extensions;
 
 
 /// <summary>
@@ -130,9 +130,56 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
         }
     }
 
+    /// <summary>
+    /// Maximum allowed length for cache keys.
+    /// </summary>
+    private const int MaxKeyLength = 900;
+
+    /// <summary>
+    /// Validates a cache key for security and format requirements.
+    /// </summary>
+    /// <param name="key">The key to validate.</param>
+    /// <exception cref="ArgumentNullException">Thrown when key is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when key is empty, whitespace, too long, or contains invalid characters.</exception>
+    private static void ValidateKey(string key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+
+        if (string.IsNullOrWhiteSpace(key))
+            throw new ArgumentException("Key cannot be null, empty, or whitespace.", nameof(key));
+
+        if (key.Length > MaxKeyLength)
+            throw new ArgumentException($"Key length cannot exceed {MaxKeyLength} characters. Actual length: {key.Length}", nameof(key));
+
+        // Check for control characters that could affect logging or downstream systems
+        foreach (var c in key)
+        {
+            if (char.IsControl(c))
+                throw new ArgumentException($"Key cannot contain control characters. Found: U+{(int)c:X4}", nameof(key));
+        }
+    }
+
+    /// <summary>
+    /// Validates multiple cache keys for security and format requirements.
+    /// </summary>
+    /// <param name="keys">The keys to validate.</param>
+    /// <exception cref="ArgumentNullException">Thrown when keys collection is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when any key is invalid.</exception>
+    private static void ValidateKeys(IEnumerable<string> keys)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+
+        foreach (var key in keys)
+        {
+            ValidateKey(key);
+        }
+    }
+
+    /// <inheritdoc/>
+    [Obsolete("Use GetAsync for better performance. Synchronous calls may cause thread pool starvation and deadlocks.")]
     public byte[]? Get(string key)
     {
-        return GetAsync(key).GetAwaiter().GetResult();
+        return GetAsync(key).ConfigureAwait(false).GetAwaiter().GetResult();
     }
 
     /// <summary>
@@ -140,23 +187,19 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
     /// </summary>
     /// <param name="key">The key of the cache entry to retrieve.</param>
     /// <returns>The cache entry if found and not expired; otherwise, null.</returns>
+    [Obsolete("Use GetEntryAsync for better performance. Synchronous calls may cause thread pool starvation and deadlocks.")]
     public CacheEntry<byte[]>? GetEntry(string key)
     {
-        return GetEntryAsync(key).GetAwaiter().GetResult();
+        return GetEntryAsync(key).ConfigureAwait(false).GetAwaiter().GetResult();
     }
 
     public async Task<byte[]?> GetAsync(string key, CancellationToken token = default)
     {
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            throw new ArgumentException("Key cannot be null, empty, or whitespace.", nameof(key));
-        }
-
+        ValidateKey(key);
 
         return await ExecuteWithResilienceAsync(GetAsyncCore(key, token),
             operationName: "GetAsync",
             key: key);
-
     }
 
     /// <summary>
@@ -168,19 +211,12 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
     public async Task<CacheEntry<byte[]>?> GetEntryAsync(string key, CancellationToken token = default)
     {
         ThrowIfDisposed();
-        ArgumentNullException.ThrowIfNull(key);
-
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            throw new ArgumentException("Key cannot be null, empty, or whitespace.", nameof(key));
-        }
-
+        ValidateKey(key);
 
         return await ExecuteWithResilienceAsync(
             GetEntryAsyncCore(key, token),
             operationName: "GetEntryAsync",
             key: key);
-
     }
 
     private async Task<byte[]?> GetAsyncCore(string key, CancellationToken token = default)
@@ -267,36 +303,32 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
         }
     }
 
+    /// <inheritdoc/>
+    [Obsolete("Use SetAsync for better performance. Synchronous calls may cause thread pool starvation and deadlocks.")]
     public void Set(string key, byte[] value, DistributedCacheEntryOptions options)
     {
-        SetAsync(key, value, options).GetAwaiter().GetResult();
+        SetAsync(key, value, options).ConfigureAwait(false).GetAwaiter().GetResult();
     }
 
     /// <summary>
     /// Sets a cache entry.
     /// </summary>
     /// <param name="entry">The cache entry to set.</param>
+    [Obsolete("Use SetEntryAsync for better performance. Synchronous calls may cause thread pool starvation and deadlocks.")]
     public void SetEntry(CacheEntry<byte[]> entry)
     {
-        SetEntryAsync(entry).GetAwaiter().GetResult();
+        SetEntryAsync(entry).ConfigureAwait(false).GetAwaiter().GetResult();
     }
 
     public async Task SetAsync(string key, byte[] value, DistributedCacheEntryOptions options, CancellationToken token = default)
     {
         ThrowIfDisposed();
-        ArgumentNullException.ThrowIfNull(key);
+        ValidateKey(key);
         ArgumentNullException.ThrowIfNull(value, nameof(value));
-
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            throw new ArgumentException("Key cannot be null, empty, or whitespace.", nameof(key));
-        }
-
 
         await ExecuteWithResilienceAsync(SetAsyncCore(key, value, options, token),
             operationName: "SetAsync",
             key: key);
-        return;
     }
 
     /// <summary>
@@ -308,17 +340,11 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
     {
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(entry);
-
-        if (string.IsNullOrWhiteSpace(entry.Key))
-        {
-            throw new ArgumentException("Entry key cannot be null, empty, or whitespace.", nameof(entry));
-        }
-
+        ValidateKey(entry.Key);
 
         await ExecuteWithResilienceAsync(SetEntryAsyncCore(entry, token),
             operationName: "SetEntryAsync",
             key: entry.Key);
-
     }
 
     private async Task SetAsyncCore(string key, byte[] value, DistributedCacheEntryOptions options, CancellationToken token = default)
@@ -429,35 +455,31 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
         }
     }
 
+    /// <inheritdoc/>
+    [Obsolete("Use RefreshAsync for better performance. Synchronous calls may cause thread pool starvation and deadlocks.")]
     public void Refresh(string key)
     {
-        RefreshAsync(key).GetAwaiter().GetResult();
+        RefreshAsync(key).ConfigureAwait(false).GetAwaiter().GetResult();
     }
 
     /// <summary>
     /// Refreshes a cache entry. Note: Sliding expiration is now handled atomically by the database.
     /// </summary>
     /// <param name="entry">The cache entry to refresh.</param>
+    [Obsolete("Use RefreshEntryAsync for better performance. Synchronous calls may cause thread pool starvation and deadlocks.")]
     public void RefreshEntry(CacheEntry<byte[]> entry)
     {
-        RefreshEntryAsync(entry).GetAwaiter().GetResult();
+        RefreshEntryAsync(entry).ConfigureAwait(false).GetAwaiter().GetResult();
     }
 
     public async Task RefreshAsync(string key, CancellationToken token = default)
     {
         ThrowIfDisposed();
-        ArgumentNullException.ThrowIfNull(key);
-
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            throw new ArgumentException("Key cannot be null, empty, or whitespace.", nameof(key));
-        }
+        ValidateKey(key);
 
         await ExecuteWithResilienceAsync(RefreshAsyncCore(key, token),
             operationName: "RefreshAsync",
             key: key);
-        return;
-
     }
 
     /// <summary>
@@ -519,35 +541,31 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
         }
     }
 
+    /// <inheritdoc/>
+    [Obsolete("Use RemoveAsync for better performance. Synchronous calls may cause thread pool starvation and deadlocks.")]
     public void Remove(string key)
     {
-        RemoveAsync(key).GetAwaiter().GetResult();
+        RemoveAsync(key).ConfigureAwait(false).GetAwaiter().GetResult();
     }
 
     /// <summary>
     /// Removes a cache entry.
     /// </summary>
     /// <param name="entry">The cache entry to remove.</param>
+    [Obsolete("Use RemoveEntryAsync for better performance. Synchronous calls may cause thread pool starvation and deadlocks.")]
     public void RemoveEntry(CacheEntry<byte[]> entry)
     {
-        RemoveEntryAsync(entry).GetAwaiter().GetResult();
+        RemoveEntryAsync(entry).ConfigureAwait(false).GetAwaiter().GetResult();
     }
 
     public async Task RemoveAsync(string key, CancellationToken token = default)
     {
         ThrowIfDisposed();
-        ArgumentNullException.ThrowIfNull(key);
-
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            throw new ArgumentException("Key cannot be null, empty, or whitespace.", nameof(key));
-        }
-
+        ValidateKey(key);
 
         await ExecuteWithResilienceAsync(RemoveAsyncCore(key, token),
             operationName: "RemoveAsync",
             key: key);
-
     }
 
     /// <summary>
@@ -559,17 +577,11 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
     {
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(entry);
-
-        if (string.IsNullOrWhiteSpace(entry.Key))
-        {
-            throw new ArgumentException("Entry key cannot be null, empty, or whitespace.", nameof(entry));
-        }
-
+        ValidateKey(entry.Key);
 
         await ExecuteWithResilienceAsync(RemoveEntryAsyncCore(entry, token),
             operationName: "RemoveEntryAsync",
             key: entry.Key);
-
     }
 
     private async Task RemoveAsyncCore(string key, CancellationToken token = default)
@@ -634,14 +646,17 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
     public async Task<Dictionary<string, byte[]?>> GetMultipleAsync(IEnumerable<string> keys, CancellationToken token = default)
     {
         ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(keys);
 
-        var keyArray = keys?.ToArray() ?? throw new ArgumentNullException(nameof(keys));
+        var keyArray = keys.ToArray();
         if (keyArray.Length == 0)
             return new Dictionary<string, byte[]?>();
 
+        // Validate all keys before proceeding
+        ValidateKeys(keyArray);
+
         // Direct allocation for better simplicity
         var result = new Dictionary<string, byte[]?>(keyArray.Length);
-        var keysRequiringUpdate = new List<string>(keyArray.Length);
 
         try
         {
@@ -680,13 +695,16 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
     public async Task<Dictionary<string, CacheEntry<byte[]>?>> GetMultipleEntriesAsync(IEnumerable<string> keys, CancellationToken token = default)
     {
         ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(keys);
 
-        var keyArray = keys?.ToArray() ?? throw new ArgumentNullException(nameof(keys));
+        var keyArray = keys.ToArray();
         if (keyArray.Length == 0)
             return new Dictionary<string, CacheEntry<byte[]>?>();
 
+        // Validate all keys before proceeding
+        ValidateKeys(keyArray);
+
         var result = new Dictionary<string, CacheEntry<byte[]>?>(keyArray.Length);
-        var keysRequiringUpdate = new List<string>(keyArray.Length);
 
         try
         {
@@ -749,18 +767,15 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
         if (entries == null || entries.Count == 0)
             return;
 
+        // Validate all keys before proceeding
+        ValidateKeys(entries.Keys);
+
         // Consider batching for very large dictionaries to avoid memory pressure
         const int maxBatchSize = 1000;
         if (entries.Count > maxBatchSize)
         {
             await ProcessLargeBatchAsync(entries, token);
             return;
-        }
-
-        var keysWithLengthError = entries.Where(kvp => kvp.Key.Length > 900).Select(kvp => kvp.Key).ToList();
-        if (keysWithLengthError.Count > 0)
-        {
-            throw new ArgumentException($"Key length cannot be greater than 900 characters. Invalid keys: {string.Join(", ", keysWithLengthError)}", nameof(entries));
         }
 
         try
@@ -1016,7 +1031,15 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
 
         for (int i = 0; i < entriesArray.Length; i += chunkSize)
         {
-            var chunk = entriesArray.Skip(i).Take(chunkSize).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+            // Calculate chunk bounds to avoid Skip/Take/ToDictionary overhead
+            var endIndex = Math.Min(i + chunkSize, entriesArray.Length);
+            var chunk = new Dictionary<string, (byte[] value, DistributedCacheEntryOptions options)>(endIndex - i);
+
+            for (int j = i; j < endIndex; j++)
+            {
+                chunk[entriesArray[j].Key] = entriesArray[j].Value;
+            }
+
             await SetMultipleAsync(chunk, token);
         }
 
@@ -1031,11 +1054,15 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
     private async Task ProcessLargeEntriesBatchAsync(CacheEntry<byte[]>[] entries, CancellationToken token)
     {
         const int chunkSize = 500; // Process in chunks of 500 entries
-        var entriesArray = entries.ToArray();
 
-        for (int i = 0; i < entriesArray.Length; i += chunkSize)
+        for (int i = 0; i < entries.Length; i += chunkSize)
         {
-            var chunk = entriesArray.Skip(i).Take(chunkSize).ToArray();
+            // Calculate chunk bounds to avoid Skip/Take/ToArray overhead
+            var endIndex = Math.Min(i + chunkSize, entries.Length);
+            var chunkSize_ = endIndex - i;
+            var chunk = new CacheEntry<byte[]>[chunkSize_];
+            Array.Copy(entries, i, chunk, 0, chunkSize_);
+
             await SetMultipleEntriesAsync(chunk, token);
         }
 
@@ -1052,10 +1079,14 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
     public async Task<int> RemoveMultipleAsync(IEnumerable<string> keys, CancellationToken token = default)
     {
         ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(keys);
 
-        var keyArray = keys?.ToArray() ?? throw new ArgumentNullException(nameof(keys));
+        var keyArray = keys.ToArray();
         if (keyArray.Length == 0)
             return 0;
+
+        // Validate all keys before proceeding
+        ValidateKeys(keyArray);
 
         try
         {
@@ -1087,10 +1118,14 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
     public async Task<int> RefreshMultipleAsync(IEnumerable<string> keys, CancellationToken token = default)
     {
         ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(keys);
 
-        var keyArray = keys?.ToArray() ?? throw new ArgumentNullException(nameof(keys));
+        var keyArray = keys.ToArray();
         if (keyArray.Length == 0)
             return 0;
+
+        // Validate all keys before proceeding
+        ValidateKeys(keyArray);
 
         try
         {
@@ -1293,8 +1328,11 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
                 return null;
             }
 
+            // Cache the array to avoid duplicate ToArray() calls
+            var serializedBytes = entry.SerializedData.ToArray();
+
             // Try to deserialize as the requested type via configured serializer
-            var value = _entryFactory.Deserialize<T>(entry.SerializedData.ToArray());
+            var value = _entryFactory.Deserialize<T>(serializedBytes);
             if (value == null)
             {
                 _logger.LogDeserializationError(key, typeof(T).Name, null);
@@ -1303,7 +1341,7 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
 
             return _entryFactory.FromSerializedData<T>(
                 key,
-                entry.SerializedData.ToArray(),
+                serializedBytes,
                 entry.AbsoluteExpiration,
                 entry.SlidingExpiration,
                 entry.BaseType);
@@ -1357,8 +1395,11 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
 
             try
             {
+                // Cache the array to avoid duplicate ToArray() calls
+                var serializedBytes = kvp.Value.SerializedData.ToArray();
+
 #pragma warning disable CS8714 
-                var value = _entryFactory.Deserialize<T>(kvp.Value.SerializedData.ToArray());
+                var value = _entryFactory.Deserialize<T>(serializedBytes);
 #pragma warning restore CS8714 
                 if (value == null)
                 {
@@ -1369,7 +1410,7 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
 
                 result[kvp.Key] = _entryFactory.FromSerializedData<T>(
                     kvp.Key,
-                    kvp.Value.SerializedData.ToArray(),
+                    serializedBytes,
                     kvp.Value.AbsoluteExpiration,
                     kvp.Value.SlidingExpiration,
                     kvp.Value.BaseType);
@@ -1390,15 +1431,7 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
     public async Task<CacheEntry<T>?> GetEntryAsync<T>(string key, CancellationToken token = default)
     {
         ThrowIfDisposed();
-        ArgumentNullException.ThrowIfNull(key);
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            throw new ArgumentException("Key cannot be null, empty, or whitespace.", nameof(key));
-        }
-        if (key.Length > 900)
-        {
-            throw new ArgumentException("Key length cannot be greater than 900 characters.", nameof(key));
-        }
+        ValidateKey(key);
 
         return await ExecuteWithResilienceAsync(
             GetTypedEntryAsync<T>(key, token),
@@ -1413,6 +1446,7 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
     {
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(entry);
+        ValidateKey(entry.Key);
 
         await ExecuteWithResilienceAsync(SetEntryAsyncCore(entry, token),
             "SetEntryAsync<T>",
@@ -1425,7 +1459,7 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
     public async Task SetEntryAsync<T>(string key, T value, DistributedCacheEntryOptions? options = null, CancellationToken token = default)
     {
         ThrowIfDisposed();
-        ArgumentNullException.ThrowIfNull(key);
+        ValidateKey(key);
         ArgumentNullException.ThrowIfNull(value);
 
         // Convert DistributedCacheEntryOptions to absolute expiration and sliding expiration
@@ -1460,8 +1494,11 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(keys);
 
+        var keyArray = keys.ToArray();
+        ValidateKeys(keyArray);
+
         var result = await ExecuteWithResilienceAsync(
-              GetMultipleTypedEntriesAsync<T>(keys, token),
+              GetMultipleTypedEntriesAsync<T>(keyArray, token),
               "GetMultipleEntriesAsync<T>");
 
         return result ?? new Dictionary<string, CacheEntry<T>?>();
@@ -1475,8 +1512,13 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(entries);
 
+        var entriesArray = entries.ToArray();
+
+        // Validate all keys before proceeding
+        ValidateKeys(entriesArray.Select(e => e.Key));
+
         await ExecuteWithResilienceAsync(
-            SetMultipleEntriesAsync(entries.Select(e =>
+            SetMultipleEntriesAsync(entriesArray.Select(e =>
             {
                 // If SerializedData is empty, we need to serialize the Value first
                 var entryToStore = e.SerializedData.IsEmpty

@@ -130,10 +130,11 @@ internal sealed class PostgreSQLDataSource : IPostgreSQLDataSource
 
             return string.Join(';', maskedParts);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // If parsing fails, return original string to avoid breaking functionality
-            return connectionString;
+            // If parsing fails, return masked placeholder to avoid exposing credentials
+            _logger.LogWarning(ex, "Failed to parse connection string for masking");
+            return "[Connection string parsing failed - masked for security]";
         }
     }
 

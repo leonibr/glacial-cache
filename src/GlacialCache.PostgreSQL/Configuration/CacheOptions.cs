@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using GlacialCache.PostgreSQL.Configuration.Security;
 using Microsoft.Extensions.Logging;
 
 namespace GlacialCache.PostgreSQL.Configuration;
@@ -31,6 +32,8 @@ public enum SerializerType
 public class CacheOptions
 {
     private ILogger? _logger;
+    private string _tableName = "glacial_cache";
+    private string _schemaName = "public";
 
     /// <summary>
     /// Sets the logger for observable properties and initializes them immediately.
@@ -43,19 +46,36 @@ public class CacheOptions
         TableNameObservable = new ObservableProperty<string>("Cache.TableName", logger) { Value = TableName };
         SchemaNameObservable = new ObservableProperty<string>("Cache.SchemaName", logger) { Value = SchemaName };
     }
+
     /// <summary>
     /// The name of the table to store cache entries. Default is "glacial_cache".
+    /// The value is validated and lowercased to ensure it's a safe PostgreSQL identifier.
     /// </summary>
     [Required(ErrorMessage = "Table name is required")]
-    [RegularExpression(@"^[a-zA-Z_][a-zA-Z0-9_]*$", ErrorMessage = "Table name must be a valid PostgreSQL identifier")]
-    public string TableName { get; set; } = "glacial_cache";
+    public string TableName
+    {
+        get => _tableName;
+        set
+        {
+            // Validate and lowercase - this will throw if invalid
+            _tableName = PostgreSQLIdentifierSanitizer.ValidateAndNormalize(value);
+        }
+    }
 
     /// <summary>
     /// The schema name where the cache table resides. Default is "public".
+    /// The value is validated and lowercased to ensure it's a safe PostgreSQL identifier.
     /// </summary>
     [Required(ErrorMessage = "Schema name is required")]
-    [RegularExpression(@"^[a-zA-Z_][a-zA-Z0-9_]*$", ErrorMessage = "Schema name must be a valid PostgreSQL identifier")]
-    public string SchemaName { get; set; } = "public";
+    public string SchemaName
+    {
+        get => _schemaName;
+        set
+        {
+            // Validate and lowercase - this will throw if invalid
+            _schemaName = PostgreSQLIdentifierSanitizer.ValidateAndNormalize(value);
+        }
+    }
 
     /// <summary>
     /// The default sliding expiration time for cache entries. Default is null (no sliding expiration).

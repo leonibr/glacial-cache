@@ -18,11 +18,13 @@ public class LockOptions
 
     /// <summary>
     /// Generates a deterministic lock key based on schema and table configuration.
-    /// All instances using the same schema/table use the same lock key.
+    /// Uses SHA256 to ensure all instances with the same schema/table configuration
+    /// generate the same lock key, which is critical for leader election to work correctly.
     /// </summary>
     internal void GenerateLockKey(string schemaName, string tableName)
     {
-        var deterministicString = $"{schemaName}_{tableName}";
-        AdvisoryLockKey = Math.Abs(deterministicString.GetHashCode());
+        // Use deterministic SHA256-based hash to ensure all instances with the same
+        // schema/table configuration generate the same lock key for manager election
+        AdvisoryLockKey = DeterministicLockKeyGenerator.GenerateManagerElectionLockKey(schemaName, tableName);
     }
 }

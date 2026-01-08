@@ -1,5 +1,7 @@
 using GlacialCache.PostgreSQL.Abstractions;
 using GlacialCache.PostgreSQL.Configuration;
+using GlacialCache.PostgreSQL.Configuration.Infrastructure;
+using GlacialCache.PostgreSQL.Configuration.Security;
 using GlacialCache.PostgreSQL.Models;
 using Microsoft.Extensions.Logging;
 using Npgsql;
@@ -37,17 +39,20 @@ public class SchemaManager : ISchemaManager
     private readonly IDbNomenclature _nomeclature;
     private readonly ILogger<SchemaManager> _logger;
     private readonly GlacialCachePostgreSQLOptions _options;
+    private readonly TimeProvider _timeProvider;
 
     internal SchemaManager(
         IPostgreSQLDataSource dataSource,
         GlacialCachePostgreSQLOptions options,
         ILogger<SchemaManager> logger,
-        IDbNomenclature nomeclature)
+        IDbNomenclature nomeclature,
+        TimeProvider? timeProvider = null)
     {
         _dataSource = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _nomeclature = nomeclature ?? throw new ArgumentNullException(nameof(nomeclature));
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     /// <summary>
@@ -170,10 +175,11 @@ public class SchemaManager : ISchemaManager
         }
     }
 
-    private int GenerateSchemaLockKey(string schemaName, string tableName)
+    private static int GenerateSchemaLockKey(string schemaName, string tableName)
     {
-        var deterministicString = $"schema_creation_{schemaName}_{tableName}";
-        return Math.Abs(deterministicString.GetHashCode());
+        // Use deterministic SHA256-based hash to ensure all instances with the same
+        // schema/table configuration generate the same lock key
+        return DeterministicLockKeyGenerator.GenerateSchemaLockKey(schemaName, tableName);
     }
 
 
@@ -181,8 +187,8 @@ public class SchemaManager : ISchemaManager
     {
         try
         {
-            // Test schema creation with a temporary schema name
-            var testSchemaName = $"glacial_cache_test_{Guid.NewGuid():N}";
+            // Test schema creation with a temporary schema name (validated and lowercased)
+            var testSchemaName = PostgreSQLIdentifierSanitizer.ValidateAndNormalize($"glacial_cache_test_{Guid.NewGuid():N}");
 
             await using var command = new NpgsqlCommand($"CREATE SCHEMA IF NOT EXISTS {testSchemaName}", connection);
             await command.ExecuteNonQueryAsync(token);
@@ -208,8 +214,8 @@ public class SchemaManager : ISchemaManager
     {
         try
         {
-            // Test table creation in the target schema
-            var testTableName = $"glacial_cache_test_{Guid.NewGuid():N}";
+            // Test table creation in the target schema (validated and lowercased)
+            var testTableName = PostgreSQLIdentifierSanitizer.ValidateAndNormalize($"glacial_cache_test_{Guid.NewGuid():N}");
 
             await using var command = new NpgsqlCommand(
                 $"CREATE TABLE IF NOT EXISTS {_nomeclature.SchemaName}.{testTableName} (id SERIAL PRIMARY KEY)",
@@ -237,27 +243,27 @@ public class SchemaManager : ISchemaManager
 
     private void LogManualSchemaScript(string permissionType)
     {
-        _logger.LogError(@"
+        // Log summary at Error level to avoid exposing implementation details
+        _logger.LogError(
+            "Permission error: Cannot create {PermissionType} due to insufficient permissions. " +
+            "Enable Debug logging to see the required SQL script, or grant CREATE privileges to the application user.",
+            permissionType);
 
-❌ PERMISSION ERROR - Manual Schema Creation Required
-💡 The application cannot create the {PermissionType} due to insufficient permissions.
-You can run the following script manually with a user who has CREATE privileges:
-
-## 📋 COPY THE SCRIPT BELOW:
-
+        // Log full SQL script only at Debug level for security
+        _logger.LogDebug(@"
+Manual Schema Creation Script:
 {Script}
 
-✅ After running this script, restart your application.
-The script is idempotent and safe to run multiple times.
-
-🔧 Alternative: Grant permissions to your application user:
-GRANT CREATE ON DATABASE your_database TO your_app_user;
-GRANT CREATE ON SCHEMA glacial_cache TO your_app_user;
-", permissionType, GetCreateSchemaSql());
+To fix, either:
+1. Run the script above with a user who has CREATE privileges
+2. Grant permissions: GRANT CREATE ON DATABASE your_database TO your_app_user;
+   and GRANT CREATE ON SCHEMA glacial_cache TO your_app_user;
+", GetCreateSchemaSql());
     }
 
     private string GetCreateSchemaSql()
     {
+        // Identifiers are validated and lowercase, safe to use directly in SQL
         return $@"-- GlacialCache PostgreSQL Schema Creation Script
 
 -- This script is idempotent and safe to run multiple times
@@ -301,6 +307,7 @@ ON {_nomeclature.FullTableName} (next_expiration);
 
     private async Task CreateTablesAsync(NpgsqlConnection connection, CancellationToken token)
     {
+        // Identifiers are validated and lowercase, safe to use directly in SQL
         var sql = $@"
 CREATE TABLE IF NOT EXISTS {_nomeclature.FullTableName} (
 key text PRIMARY KEY,
@@ -336,21 +343,21 @@ ON {_nomeclature.FullTableName} (next_expiration);";
     private async Task WaitForSchemaReadyAsync(CancellationToken token)
     {
         var timeout = TimeSpan.FromSeconds(30);
-        var startTime = DateTime.UtcNow;
+        var startTime = _timeProvider.GetUtcNow();
         var delay = TimeSpan.FromMilliseconds(100);
         const int maxDelay = 2000;
         var attemptCount = 0;
 
         _logger.LogDebug("Waiting for schema to be ready (timeout: {Timeout}s)", timeout.TotalSeconds);
 
-        while (DateTime.UtcNow - startTime < timeout)
+        while (_timeProvider.GetUtcNow() - startTime < timeout)
         {
             attemptCount++;
 
             if (await IsSchemaReadyAsync(token))
             {
                 _logger.LogInformation("Schema is ready after {AttemptCount} attempt(s) and {ElapsedMs}ms",
-                    attemptCount, (DateTime.UtcNow - startTime).TotalMilliseconds);
+                    attemptCount, (_timeProvider.GetUtcNow() - startTime).TotalMilliseconds);
                 return;
             }
 
@@ -385,6 +392,7 @@ ON {_nomeclature.FullTableName} (next_expiration);";
                 await using var connection = await _dataSource.GetConnectionAsync(token);
 
                 // Step 1: Check if table exists using information_schema (more reliable)
+                // Identifiers are already lowercase
                 await using var existsCommand = new NpgsqlCommand(
                     @"SELECT EXISTS (
                         SELECT 1 FROM information_schema.tables
@@ -395,7 +403,7 @@ ON {_nomeclature.FullTableName} (next_expiration);";
                 existsCommand.Parameters.AddWithValue("@schema", _nomeclature.SchemaName);
                 existsCommand.Parameters.AddWithValue("@table", _nomeclature.TableName);
 
-                var tableExists = (bool)await existsCommand.ExecuteScalarAsync(token);
+                var tableExists = (bool)(await existsCommand.ExecuteScalarAsync(token))!;
                 if (!tableExists)
                 {
                     return false; // Table doesn't exist yet

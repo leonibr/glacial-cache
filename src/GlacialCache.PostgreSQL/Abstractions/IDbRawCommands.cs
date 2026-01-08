@@ -2,7 +2,7 @@
 
 using Microsoft.Extensions.Caching.Distributed;
 
-internal interface IDbRawCommands
+internal interface IDbRawCommands : IDisposable
 {
     /// <summary>
     /// Gets the SQL for getting a key.

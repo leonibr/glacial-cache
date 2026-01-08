@@ -127,7 +127,8 @@ public static class ServiceCollectionExtensions
             var options = sp.GetRequiredService<IOptionsMonitor<GlacialCachePostgreSQLOptions>>();
             var logger = sp.GetRequiredService<ILogger<SchemaManager>>();
             var nomeclature = sp.GetRequiredService<IDbNomenclature>();
-            return new SchemaManager(dataSource, options.CurrentValue, logger, nomeclature);
+            var timeProvider = sp.GetRequiredService<TimeProvider>();
+            return new SchemaManager(dataSource, options.CurrentValue, logger, nomeclature, timeProvider);
         });
 
         services.TryAddSingleton<ElectionState>(sp =>

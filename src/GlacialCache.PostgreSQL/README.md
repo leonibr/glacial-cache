@@ -168,8 +168,8 @@ GlacialCache supports two serialization strategies for complex objects while mai
 
 | Serializer Type | Description                           | Performance | Use Case                                       |
 | --------------- | ------------------------------------- | ----------- | ---------------------------------------------- |
-| `MemoryPack`    | Fast binary serialization (default)   | Highest     | High-performance applications, complex objects |
-| `JsonBytes`     | JSON serialization with optimizations | High        | Interoperability, debugging, simple objects    |
+| `JsonBytes`     | JSON serialization with optimizations (default) | High        | Interoperability, debugging, simple objects    |
+| `MemoryPack`    | Fast binary serialization             | Highest     | High-performance applications, complex objects |
 
 ### String and Byte Array Optimization
 
@@ -182,11 +182,11 @@ Both serializers include automatic optimizations:
 ### Configuration Examples
 
 ```csharp
-// Use MemoryPack for maximum performance (default)
+// Use JsonBytes for compatibility (default)
 builder.Services.AddGlacialCachePostgreSQL(options =>
 {
     options.Connection.ConnectionString = connectionString;
-    options.Cache.Serializer = SerializerType.MemoryPack;
+    options.Cache.Serializer = SerializerType.JsonBytes;
 });
 
 // Use JSON for better interoperability

@@ -138,6 +138,27 @@ public class IncrementalConfigurationValidator
                 new[] { "Cache.SchemaName" }));
         }
 
+        if (options.Cache.MinimumExpirationInterval <= TimeSpan.Zero)
+        {
+            results.Add(new ValidationResult(
+                "Minimum expiration interval must be positive",
+                new[] { "Cache.MinimumExpirationInterval" }));
+        }
+
+        if (options.Cache.MaximumExpirationInterval <= TimeSpan.Zero)
+        {
+            results.Add(new ValidationResult(
+                "Maximum expiration interval must be positive",
+                new[] { "Cache.MaximumExpirationInterval" }));
+        }
+
+        if (options.Cache.MinimumExpirationInterval > options.Cache.MaximumExpirationInterval)
+        {
+            results.Add(new ValidationResult(
+                "Minimum expiration interval cannot be greater than maximum expiration interval",
+                new[] { "Cache.MinimumExpirationInterval", "Cache.MaximumExpirationInterval" }));
+        }
+
         return results;
     }
 

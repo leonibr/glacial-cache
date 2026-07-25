@@ -4,15 +4,16 @@ using GlacialCache.PostgreSQL.Configuration;
 using Microsoft.Extensions.Options;
 using System.ComponentModel;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace GlacialCache.PostgreSQL.Models;
-using Extensions;
 
-internal sealed class DbRawCommands : IDbRawCommands, IDisposable
+internal sealed class DbRawCommands : IDbRawCommands, IRuntimeConfigurationSubscriber, IDisposable
 {
     private readonly IDbNomenclature _dbNomenclature;
-    private readonly IOptionsMonitor<GlacialCachePostgreSQLOptions> _optionsMonitor;
-    private readonly IDisposable? _optionsChangeToken;
+    private readonly GlacialCachePostgreSQLOptions _observableOptions;
+    private readonly IDisposable _runtimeConfigurationSubscription;
+    private readonly IRuntimeConfigurationPublisher? _ownedRuntimeConfigurationPublisher;
     private GlacialCachePostgreSQLOptions _options;
     private readonly ILogger<DbRawCommands>? _logger;
     private readonly object _lockObject = new();
@@ -30,44 +31,57 @@ internal sealed class DbRawCommands : IDbRawCommands, IDisposable
     private string? _refreshMultipleSql;
 
     internal DbRawCommands(IDbNomenclature dbNomenclature, IOptionsMonitor<GlacialCachePostgreSQLOptions> options, ILogger<DbRawCommands>? logger = null)
+        : this(
+            dbNomenclature,
+            options,
+            logger,
+            new RuntimeConfigurationPublisher(
+                options,
+                new ObservableOptionsSynchronizer(),
+                NullLogger<RuntimeConfigurationPublisher>.Instance),
+            ownsRuntimeConfigurationPublisher: true)
+    {
+    }
+
+    internal DbRawCommands(
+        IDbNomenclature dbNomenclature,
+        IOptionsMonitor<GlacialCachePostgreSQLOptions> options,
+        ILogger<DbRawCommands>? logger,
+        IRuntimeConfigurationPublisher runtimeConfigurationPublisher)
+        : this(dbNomenclature, options, logger, runtimeConfigurationPublisher, ownsRuntimeConfigurationPublisher: false)
+    {
+    }
+
+    private DbRawCommands(
+        IDbNomenclature dbNomenclature,
+        IOptionsMonitor<GlacialCachePostgreSQLOptions> options,
+        ILogger<DbRawCommands>? logger,
+        IRuntimeConfigurationPublisher runtimeConfigurationPublisher,
+        bool ownsRuntimeConfigurationPublisher)
     {
         ArgumentNullException.ThrowIfNull(options);
         _dbNomenclature = dbNomenclature ?? throw new ArgumentNullException(nameof(dbNomenclature));
-        _optionsMonitor = options;
         _options = options.CurrentValue;
+        _observableOptions = _options;
         _logger = logger;
+        _ownedRuntimeConfigurationPublisher = ownsRuntimeConfigurationPublisher ? runtimeConfigurationPublisher : null;
         _cacheOptions = options.CurrentValue.Cache;
 
         // Subscribe directly to ObservableProperty changes for configuration updates
         _options.Cache.TableNameObservable.PropertyChanged += OnConfigurationPropertyChanged;
         _options.Cache.SchemaNameObservable.PropertyChanged += OnConfigurationPropertyChanged;
 
-        // Register for external configuration changes (IOptionsMonitor pattern)
-        _optionsChangeToken = _optionsMonitor.OnChange(OnExternalConfigurationChanged);
+        _runtimeConfigurationSubscription = runtimeConfigurationPublisher.Subscribe(this);
 
         // Initial SQL build
         Reload(dbNomenclature);
     }
 
-    /// <summary>
-    /// Handles external configuration changes from IOptionsMonitor and syncs to observable properties.
-    /// </summary>
-    private void OnExternalConfigurationChanged(GlacialCachePostgreSQLOptions newOptions)
+    public void OnRuntimeConfigurationChanged(GlacialCachePostgreSQLOptions options)
     {
-        try
-        {
-            // Use extension method to sync observable properties
-            _options.Cache.SyncFromExternalChanges(newOptions.Cache, _logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<DbRawCommands>.Instance);
-
-            // Update our internal reference
-            _options = newOptions;
-
-            _logger?.LogDebug("External configuration changes synchronized to observable properties");
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "Failed to sync external configuration changes");
-        }
+        _options = options;
+        Reload(_dbNomenclature);
+        _logger?.LogDebug("Runtime configuration changes synchronized to raw SQL commands");
     }
 
     /// <summary>
@@ -75,6 +89,11 @@ internal sealed class DbRawCommands : IDbRawCommands, IDisposable
     /// </summary>
     private void OnConfigurationPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (RuntimeConfigurationReloadScope.IsActive)
+        {
+            return;
+        }
+
         try
         {
             if (e is PropertyChangedEventArgs<string> typedArgs)
@@ -299,10 +318,10 @@ internal sealed class DbRawCommands : IDbRawCommands, IDisposable
     public void Dispose()
     {
         // Unsubscribe from ObservableProperty events to prevent memory leaks
-        _options.Cache.TableNameObservable.PropertyChanged -= OnConfigurationPropertyChanged;
-        _options.Cache.SchemaNameObservable.PropertyChanged -= OnConfigurationPropertyChanged;
+        _observableOptions.Cache.TableNameObservable.PropertyChanged -= OnConfigurationPropertyChanged;
+        _observableOptions.Cache.SchemaNameObservable.PropertyChanged -= OnConfigurationPropertyChanged;
 
-        // Dispose the options change token to prevent memory leaks
-        _optionsChangeToken?.Dispose();
+        _runtimeConfigurationSubscription.Dispose();
+        _ownedRuntimeConfigurationPublisher?.Dispose();
     }
 }

@@ -7,15 +7,15 @@ using GlacialCache.PostgreSQL.Serializers;
 namespace GlacialCache.PostgreSQL.Tests.Shared;
 
 /// <summary>
-/// Test helper for creating CacheEntry instances using the factory pattern.
+/// Test helper for creating CacheEntry instances using the helper pattern.
 /// </summary>
 public static class CacheEntryTestHelper
 {
-    private static readonly GlacialCacheEntryFactory _memoryPackFactory = new(new MemoryPackCacheEntrySerializer());
+    private static readonly CacheEntryHelper _memoryPackHelper = new(new MemoryPackCacheEntrySerializer());
 
-    private static readonly GlacialCacheEntryFactory _jsonFactory = new(new JsonCacheEntrySerializer());
+    private static readonly CacheEntryHelper _jsonHelper = new(new JsonCacheEntrySerializer());
     /// <summary>
-    /// Creates a CacheEntry using the MemoryPack factory (default for backward compatibility).
+    /// Creates a CacheEntry using the MemoryPack helper (default for backward compatibility).
     /// </summary>
     public static CacheEntry<T> Create<T>(
         string key,
@@ -23,7 +23,7 @@ public static class CacheEntryTestHelper
         DateTimeOffset? absoluteExpiration = null,
         TimeSpan? slidingExpiration = null)
     {
-        return _memoryPackFactory.Create(key, value, absoluteExpiration, slidingExpiration);
+        return _memoryPackHelper.Create(key, value, absoluteExpiration, slidingExpiration);
     }
 
     /// <summary>
@@ -36,12 +36,12 @@ public static class CacheEntryTestHelper
         DateTimeOffset? absoluteExpiration = null,
         TimeSpan? slidingExpiration = null)
     {
-        var factory = GetFactory(serializerType);
-        return factory.Create(key, value, absoluteExpiration, slidingExpiration);
+        var helper = GetHelper(serializerType);
+        return helper.Create(key, value, absoluteExpiration, slidingExpiration);
     }
 
     /// <summary>
-    /// Creates a CacheEntry from serialized data using the MemoryPack factory (default for backward compatibility).
+    /// Creates a CacheEntry from serialized data using the MemoryPack helper (default for backward compatibility).
     /// </summary>
     public static CacheEntry<T> FromSerializedData<T>(
         string key,
@@ -50,7 +50,7 @@ public static class CacheEntryTestHelper
         TimeSpan? slidingExpiration = null,
         string? baseType = null)
     {
-        return _memoryPackFactory.FromSerializedData<T>(key, serializedValue, absoluteExpiration, slidingExpiration, baseType);
+        return _memoryPackHelper.FromSerializedData<T>(key, serializedValue, absoluteExpiration, slidingExpiration, baseType);
     }
 
     /// <summary>
@@ -64,12 +64,12 @@ public static class CacheEntryTestHelper
         TimeSpan? slidingExpiration = null,
         string? baseType = null)
     {
-        var factory = GetFactory(serializerType);
-        return factory.FromSerializedData<T>(key, serializedValue, absoluteExpiration, slidingExpiration, baseType);
+        var helper = GetHelper(serializerType);
+        return helper.FromSerializedData<T>(key, serializedValue, absoluteExpiration, slidingExpiration, baseType);
     }
 
     /// <summary>
-    /// Creates a CacheEntry from serialized data using the factory (string overload for convenience).
+    /// Creates a CacheEntry from serialized data using the helper (string overload for convenience).
     /// </summary>
     public static CacheEntry<string> FromSerializedData(
         string key,
@@ -78,7 +78,7 @@ public static class CacheEntryTestHelper
         TimeSpan? slidingExpiration = null,
         string? baseType = null)
     {
-        return _memoryPackFactory.FromSerializedData<string>(key, serializedValue, absoluteExpiration, slidingExpiration, baseType);
+        return _memoryPackHelper.FromSerializedData<string>(key, serializedValue, absoluteExpiration, slidingExpiration, baseType);
     }
 
     /// <summary>
@@ -92,8 +92,8 @@ public static class CacheEntryTestHelper
         TimeSpan? slidingExpiration = null,
         string? baseType = null)
     {
-        var factory = GetFactory(serializerType);
-        return factory.FromSerializedData<string>(key, serializedValue, absoluteExpiration, slidingExpiration, baseType);
+        var helper = GetHelper(serializerType);
+        return helper.FromSerializedData<string>(key, serializedValue, absoluteExpiration, slidingExpiration, baseType);
     }
 
     /// <summary>
@@ -106,18 +106,18 @@ public static class CacheEntryTestHelper
         DateTimeOffset? absoluteExpiration = null,
         TimeSpan? slidingExpiration = null)
     {
-        return _memoryPackFactory.Create(key, value, absoluteExpiration, slidingExpiration);
+        return _memoryPackHelper.Create(key, value, absoluteExpiration, slidingExpiration);
     }
 
     /// <summary>
-    /// Gets the factory for the specified serializer type.
+    /// Gets the helper for the specified serializer type.
     /// </summary>
-    private static GlacialCacheEntryFactory GetFactory(SerializerType serializerType)
+    private static CacheEntryHelper GetHelper(SerializerType serializerType)
     {
         return serializerType switch
         {
-            SerializerType.MemoryPack => _memoryPackFactory,
-            SerializerType.JsonBytes => _jsonFactory,
+            SerializerType.MemoryPack => _memoryPackHelper,
+            SerializerType.JsonBytes => _jsonHelper,
             _ => throw new ArgumentException($"Unsupported serializer type: {serializerType}")
         };
     }

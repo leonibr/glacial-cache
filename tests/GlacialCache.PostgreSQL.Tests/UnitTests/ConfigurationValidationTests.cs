@@ -15,6 +15,20 @@ public class ConfigurationValidationTests
         _logger = new LoggerFactory().CreateLogger<ConfigurationValidationTests>();
     }
 
+    private static GlacialCachePostgreSQLOptions CreateValidOptions() => new()
+    {
+        Maintenance = new MaintenanceOptions { EnableAutomaticCleanup = false },
+        Connection = new ConnectionOptions
+        {
+            ConnectionString = "Host=localhost;Database=testdb;Username=testuser;Password=testpass"
+        },
+        Cache = new CacheOptions
+        {
+            TableName = "glacial_cache",
+            SchemaName = "public"
+        }
+    };
+
     [Fact]
     public void ValidateOptions_WithValidOptions_ShouldNotThrow()
     {
@@ -67,6 +81,46 @@ public class ConfigurationValidationTests
         var action = () => ConfigurationValidator.ValidateOptions(options, _logger);
         action.ShouldThrow<ArgumentException>()
             .Message.ShouldContain("Connection string cannot be null or empty");
+    }
+
+    [Fact]
+    public void ValidateOptions_WithNonPositiveMinimumExpirationInterval_ShouldThrowArgumentException()
+    {
+        // Arrange
+        var options = CreateValidOptions();
+        options.Cache.MinimumExpirationInterval = TimeSpan.Zero;
+
+        // Act & Assert
+        var action = () => ConfigurationValidator.ValidateOptions(options, _logger);
+        action.ShouldThrow<ArgumentException>()
+            .Message.ShouldContain("Minimum expiration interval must be positive");
+    }
+
+    [Fact]
+    public void ValidateOptions_WithNonPositiveMaximumExpirationInterval_ShouldThrowArgumentException()
+    {
+        // Arrange
+        var options = CreateValidOptions();
+        options.Cache.MaximumExpirationInterval = TimeSpan.Zero;
+
+        // Act & Assert
+        var action = () => ConfigurationValidator.ValidateOptions(options, _logger);
+        action.ShouldThrow<ArgumentException>()
+            .Message.ShouldContain("Maximum expiration interval must be positive");
+    }
+
+    [Fact]
+    public void ValidateOptions_WithMinimumExpirationGreaterThanMaximum_ShouldThrowArgumentException()
+    {
+        // Arrange
+        var options = CreateValidOptions();
+        options.Cache.MinimumExpirationInterval = TimeSpan.FromSeconds(2);
+        options.Cache.MaximumExpirationInterval = TimeSpan.FromSeconds(1);
+
+        // Act & Assert
+        var action = () => ConfigurationValidator.ValidateOptions(options, _logger);
+        action.ShouldThrow<ArgumentException>()
+            .Message.ShouldContain("Minimum expiration interval cannot be greater than maximum expiration interval");
     }
 
     [Fact]

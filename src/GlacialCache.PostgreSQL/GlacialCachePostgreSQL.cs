@@ -2,6 +2,7 @@ using MemoryPack;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using Polly;
@@ -19,10 +20,10 @@ using Services;
 /// <summary>
 /// Enhanced PostgreSQL implementation of IDistributedCache with connection optimization.
 /// </summary>
-public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
+public class GlacialCachePostgreSQL : IGlacialCache, IRuntimeConfigurationSubscriber, IDisposable
 {
-    private readonly IOptionsMonitor<GlacialCachePostgreSQLOptions> _optionsMonitor;
-    private readonly IDisposable? _optionsChangeToken;
+    private readonly IDisposable _runtimeConfigurationSubscription;
+    private readonly IRuntimeConfigurationPublisher? _ownedRuntimeConfigurationPublisher;
     private GlacialCachePostgreSQLOptions _options;
     private readonly ILogger<GlacialCachePostgreSQL> _logger;
     private readonly ITimeConverterService _timeConverter;
@@ -33,7 +34,7 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
     private readonly IPolicyFactory? _policyFactory;
     private readonly IAsyncPolicy? _resiliencePolicy;
     private readonly TimeProvider _timeProvider;
-    private readonly GlacialCacheEntryFactory _entryFactory;
+    private readonly CacheEntryHelper _entryHelper;
 
 
 
@@ -46,7 +47,59 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
         IDbRawCommands dbRawCommands,
         IServiceProvider serviceProvider,
         TimeProvider timeProvider,
-        GlacialCacheEntryFactory entryFactory)
+        CacheEntryHelper entryHelper)
+        : this(
+            options,
+            logger,
+            timeConverter,
+            dataSource,
+            dbRawCommands,
+            serviceProvider,
+            timeProvider,
+            entryHelper,
+            new RuntimeConfigurationPublisher(
+                options,
+                new ObservableOptionsSynchronizer(),
+                NullLogger<RuntimeConfigurationPublisher>.Instance),
+            ownsRuntimeConfigurationPublisher: true)
+    {
+    }
+
+    internal GlacialCachePostgreSQL(
+        IOptionsMonitor<GlacialCachePostgreSQLOptions> options,
+        ILogger<GlacialCachePostgreSQL> logger,
+        ITimeConverterService timeConverter,
+        IPostgreSQLDataSource dataSource,
+        IDbRawCommands dbRawCommands,
+        IServiceProvider serviceProvider,
+        TimeProvider timeProvider,
+        CacheEntryHelper entryHelper,
+        IRuntimeConfigurationPublisher runtimeConfigurationPublisher)
+        : this(
+            options,
+            logger,
+            timeConverter,
+            dataSource,
+            dbRawCommands,
+            serviceProvider,
+            timeProvider,
+            entryHelper,
+            runtimeConfigurationPublisher,
+            ownsRuntimeConfigurationPublisher: false)
+    {
+    }
+
+    private GlacialCachePostgreSQL(
+        IOptionsMonitor<GlacialCachePostgreSQLOptions> options,
+        ILogger<GlacialCachePostgreSQL> logger,
+        ITimeConverterService timeConverter,
+        IPostgreSQLDataSource dataSource,
+        IDbRawCommands dbRawCommands,
+        IServiceProvider serviceProvider,
+        TimeProvider timeProvider,
+        CacheEntryHelper entryHelper,
+        IRuntimeConfigurationPublisher runtimeConfigurationPublisher,
+        bool ownsRuntimeConfigurationPublisher)
     {
 
         ArgumentNullException.ThrowIfNull(options);
@@ -55,20 +108,21 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
         ArgumentNullException.ThrowIfNull(dbRawCommands);
         ArgumentNullException.ThrowIfNull(serviceProvider);
         ArgumentNullException.ThrowIfNull(timeProvider);
-        ArgumentNullException.ThrowIfNull(entryFactory);
+        ArgumentNullException.ThrowIfNull(entryHelper);
+        ArgumentNullException.ThrowIfNull(runtimeConfigurationPublisher);
         if (string.IsNullOrEmpty(options.CurrentValue.Connection.ConnectionString))
             throw new ArgumentException("Connection string cannot be null or empty.", nameof(options));
 
-        _optionsMonitor = options;
         _options = options.CurrentValue ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _ownedRuntimeConfigurationPublisher = ownsRuntimeConfigurationPublisher ? runtimeConfigurationPublisher : null;
 
         _dataSource = dataSource;
         _timeConverter = timeConverter;
         _dbRawCommands = dbRawCommands;
         _serviceProvider = serviceProvider;
         _timeProvider = timeProvider;
-        _entryFactory = entryFactory;
+        _entryHelper = entryHelper;
 
         // Initialize resilience patterns if enabled
         if (_options.Resilience.EnableResiliencePatterns)
@@ -80,34 +134,16 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
             }
         }
 
-        // Register for external configuration changes (IOptionsMonitor pattern)
-        _optionsChangeToken = _optionsMonitor.OnChange(OnExternalConfigurationChanged);
+        _runtimeConfigurationSubscription = runtimeConfigurationPublisher.Subscribe(this);
 
         // Initialize the cache table synchronously
         EnsureInitialized();
     }
 
-    /// <summary>
-    /// Handles external configuration changes from IOptionsMonitor and syncs to observable properties.
-    /// </summary>
-    private void OnExternalConfigurationChanged(GlacialCachePostgreSQLOptions newOptions)
+    public void OnRuntimeConfigurationChanged(GlacialCachePostgreSQLOptions options)
     {
-        try
-        {
-            // Use extension method to sync observable properties for Cache and Connection
-            _options.Cache.SyncFromExternalChanges(newOptions.Cache, _logger);
-            _options.Connection.SyncFromExternalChanges(newOptions.Connection, _logger);
-            _options.Connection.Pool.SyncFromExternalChanges(newOptions.Connection.Pool, _logger);
-
-            // Update our internal reference
-            _options = newOptions;
-
-            _logger.LogDebug("External configuration changes synchronized to observable properties");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to sync external configuration changes");
-        }
+        _options = options;
+        _logger.LogDebug("Runtime configuration changes synchronized to cache service");
     }
 
     /// <summary>
@@ -173,6 +209,36 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
         {
             ValidateKey(key);
         }
+    }
+
+    internal static NpgsqlBatchCommand CreateSetMultipleBatchCommand(
+        string setMultipleSql,
+        string key,
+        byte[] value,
+        TimeSpan? relativeInterval,
+        TimeSpan? slidingExpiration,
+        string? valueType,
+        DateTimeOffset now)
+    {
+        var batchCommand = new NpgsqlBatchCommand(setMultipleSql);
+
+        batchCommand.Parameters.Add(new() { Value = key });
+        batchCommand.Parameters.Add(new() { Value = value });
+
+        if (relativeInterval.HasValue)
+            batchCommand.Parameters.Add(new() { Value = relativeInterval.Value });
+        else
+            batchCommand.Parameters.Add(new() { Value = (object)DBNull.Value, NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Interval });
+
+        if (slidingExpiration.HasValue)
+            batchCommand.Parameters.Add(new() { Value = slidingExpiration.Value });
+        else
+            batchCommand.Parameters.Add(new() { Value = (object)DBNull.Value, NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Interval });
+
+        batchCommand.Parameters.Add(new() { Value = valueType ?? (object)DBNull.Value });
+        batchCommand.Parameters.Add(new() { Value = now });
+
+        return batchCommand;
     }
 
     /// <inheritdoc/>
@@ -294,7 +360,7 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
             // Note: Sliding expiration is now handled atomically by the CTE in the SQL query above
             // Entry is guaranteed to be non-expired if we reach this point
 
-            return _entryFactory.FromSerializedData<byte[]>(key, value, absoluteExpiration, slidingExpiration, baseType);
+            return _entryHelper.FromSerializedData<byte[]>(key, value, absoluteExpiration, slidingExpiration, baseType);
         }
         catch (Exception ex)
         {
@@ -351,11 +417,12 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
     {
         // Convert absolute expiration to relative interval using TimeConverterService
         TimeSpan? relativeInterval = null;
+        var now = _timeProvider.GetUtcNow();
 
         // Handle DistributedCacheEntryOptions logic in the calling code
         if (options.AbsoluteExpiration.HasValue)
         {
-            relativeInterval = _timeConverter.ConvertToRelativeInterval(options.AbsoluteExpiration.Value);
+            relativeInterval = _timeConverter.ConvertToRelativeInterval(options.AbsoluteExpiration.Value, now);
         }
         else if (options.AbsoluteExpirationRelativeToNow.HasValue)
         {
@@ -384,7 +451,7 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
             {
                 Key = key,
                 Value = value,
-                Now = _timeProvider.GetUtcNow(),
+                Now = now,
                 RelativeInterval = relativeInterval,
                 SlidingInterval = slidingInterval,
                 ValueType = null
@@ -405,11 +472,11 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
     {
         // If SerializedData is empty, we need to serialize the Value first
         var entryToStore = entry.SerializedData.IsEmpty
-            ? _entryFactory.Create(entry.Key, entry.Value, entry.AbsoluteExpiration, entry.SlidingExpiration)
+            ? _entryHelper.Create(entry.Key, entry.Value, entry.AbsoluteExpiration, entry.SlidingExpiration)
             : entry;
 
         // Create a byte[] entry from the serialized value
-        var byteEntry = _entryFactory.FromSerializedData<byte[]>(
+        var byteEntry = _entryHelper.FromSerializedData<byte[]>(
             entryToStore.Key,
             entryToStore.SerializedData.ToArray(),
             entryToStore.AbsoluteExpiration,
@@ -429,16 +496,17 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
             await using var command = new NpgsqlCommand(_dbRawCommands.SetSql, connection);
 
             TimeSpan? relativeInterval = null;
+            var now = _timeProvider.GetUtcNow();
             if (entry.AbsoluteExpiration.HasValue)
             {
-                relativeInterval = _timeConverter.ConvertToRelativeInterval(entry.AbsoluteExpiration.Value);
+                relativeInterval = _timeConverter.ConvertToRelativeInterval(entry.AbsoluteExpiration.Value, now);
             }
 
             var parameters = new SetEntryParameters
             {
                 Key = entry.Key,
                 Value = entry.SerializedData.ToArray(),
-                Now = _timeProvider.GetUtcNow(),
+                Now = now,
                 RelativeInterval = relativeInterval,
                 SlidingInterval = entry.SlidingExpiration,
                 ValueType = !string.IsNullOrWhiteSpace(entry.BaseType) ? entry.BaseType : null
@@ -739,7 +807,7 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
                 {
                     baseType = reader.GetString(4);  // value_type column (was index 5, now index 4)
                 }
-                var cacheEntry = _entryFactory.FromSerializedData<byte[]>(key, value, absoluteExpiration, slidingExpiration, baseType);
+                var cacheEntry = _entryHelper.FromSerializedData<byte[]>(key, value, absoluteExpiration, slidingExpiration, baseType);
                 result[key] = cacheEntry;
 
                 // Note: Sliding expiration updates are now handled atomically by the CTE in the SQL query above
@@ -789,11 +857,12 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
             {
                 // Phase 2: Convert absolute expiration to relative interval using TimeConverterService
                 TimeSpan? relativeInterval = null;
+                var now = _timeProvider.GetUtcNow();
 
                 // Handle DistributedCacheEntryOptions logic
                 if (entry.Value.options.AbsoluteExpiration.HasValue)
                 {
-                    relativeInterval = _timeConverter.ConvertToRelativeInterval(entry.Value.options.AbsoluteExpiration.Value);
+                    relativeInterval = _timeConverter.ConvertToRelativeInterval(entry.Value.options.AbsoluteExpiration.Value, now);
                 }
                 else if (entry.Value.options.AbsoluteExpirationRelativeToNow.HasValue)
                 {
@@ -810,26 +879,14 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
                 }
 
                 var slidingExpiration = entry.Value.options.SlidingExpiration ?? _options.Cache.DefaultSlidingExpiration;
-
-                var batchCommand = new NpgsqlBatchCommand(_dbRawCommands.SetMultipleSql);
-
-                batchCommand.Parameters.Add(new() { Value = entry.Key });
-                batchCommand.Parameters.Add(new() { Value = entry.Value.value });
-
-                // Phase 2: Use relative interval instead of absolute expiration
-                if (relativeInterval.HasValue)
-                    batchCommand.Parameters.Add(new() { Value = relativeInterval.Value });
-                else
-                    batchCommand.Parameters.Add(new() { Value = (object)DBNull.Value, NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Interval });
-
-                if (slidingExpiration.HasValue)
-                    batchCommand.Parameters.Add(new() { Value = slidingExpiration.Value });
-                else
-                    batchCommand.Parameters.Add(new() { Value = (object)DBNull.Value, NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Interval });
-
-                // batchCommand.Parameters.Add(new() { Value = lastAccessed });
-                batchCommand.Parameters.Add(new() { Value = DBNull.Value });
-                batchCommand.Parameters.Add(new() { Value = _timeProvider.GetUtcNow() });
+                var batchCommand = CreateSetMultipleBatchCommand(
+                    _dbRawCommands.SetMultipleSql,
+                    entry.Key,
+                    entry.Value.value,
+                    relativeInterval,
+                    slidingExpiration,
+                    null,
+                    now);
 
                 batch.BatchCommands.Add(batchCommand);
             }
@@ -885,11 +942,12 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
             {
                 // Phase 2: Convert absolute expiration to relative interval using TimeConverterService
                 TimeSpan? relativeInterval = null;
+                var now = _timeProvider.GetUtcNow();
 
                 // Handle DistributedCacheEntryOptions logic
                 if (entry.Value.options.AbsoluteExpiration.HasValue)
                 {
-                    relativeInterval = _timeConverter.ConvertToRelativeInterval(entry.Value.options.AbsoluteExpiration.Value);
+                    relativeInterval = _timeConverter.ConvertToRelativeInterval(entry.Value.options.AbsoluteExpiration.Value, now);
                 }
                 else if (entry.Value.options.AbsoluteExpirationRelativeToNow.HasValue)
                 {
@@ -906,25 +964,14 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
                 }
 
                 var slidingExpiration = entry.Value.options.SlidingExpiration ?? _options.Cache.DefaultSlidingExpiration;
-
-                var batchCommand = new NpgsqlBatchCommand(_dbRawCommands.SetMultipleSql);
-
-                batchCommand.Parameters.Add(new() { Value = entry.Key });
-                // ROM<byte> -> byte[] for Npgsql parameter
-                batchCommand.Parameters.Add(new() { Value = entry.Value.value.ToArray() });
-
-                // Phase 2: Use relative interval instead of absolute expiration
-                if (relativeInterval.HasValue)
-                    batchCommand.Parameters.Add(new() { Value = relativeInterval.Value });
-                else
-                    batchCommand.Parameters.Add(new() { Value = (object)DBNull.Value, NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Interval });
-
-                if (slidingExpiration.HasValue)
-                    batchCommand.Parameters.Add(new() { Value = slidingExpiration.Value });
-                else
-                    batchCommand.Parameters.Add(new() { Value = (object)DBNull.Value, NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Interval });
-
-                batchCommand.Parameters.Add(new() { Value = DBNull.Value });
+                var batchCommand = CreateSetMultipleBatchCommand(
+                    _dbRawCommands.SetMultipleSql,
+                    entry.Key,
+                    entry.Value.value.ToArray(),
+                    relativeInterval,
+                    slidingExpiration,
+                    null,
+                    now);
 
                 batch.BatchCommands.Add(batchCommand);
             }
@@ -978,32 +1025,23 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
 
             foreach (var entry in entriesArray)
             {
-                var batchCommand = new NpgsqlBatchCommand(_dbRawCommands.SetMultipleSql);
-
-                batchCommand.Parameters.Add(new() { Value = entry.Key });
-                batchCommand.Parameters.Add(new() { Value = entry.Value });
+                TimeSpan? relativeInterval = null;
+                var now = _timeProvider.GetUtcNow();
 
                 // Phase 2: Convert absolute expiration to relative interval using TimeConverterService
                 if (entry.AbsoluteExpiration.HasValue)
                 {
-                    var relativeInterval = _timeConverter.ConvertToRelativeInterval(entry.AbsoluteExpiration.Value);
-                    if (relativeInterval.HasValue)
-                        batchCommand.Parameters.Add(new() { Value = relativeInterval.Value });
-                    else
-                        batchCommand.Parameters.Add(new() { Value = (object)DBNull.Value, NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Interval });
-                }
-                else
-                {
-                    batchCommand.Parameters.Add(new() { Value = (object)DBNull.Value, NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Interval });
+                    relativeInterval = _timeConverter.ConvertToRelativeInterval(entry.AbsoluteExpiration.Value, now);
                 }
 
-                if (entry.SlidingExpiration.HasValue)
-                    batchCommand.Parameters.Add(new() { Value = entry.SlidingExpiration.Value });
-                else
-                    batchCommand.Parameters.Add(new() { Value = (object)DBNull.Value, NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Interval });
-
-                batchCommand.Parameters.Add(new() { Value = (object)DBNull.Value });
-                batchCommand.Parameters.Add(new() { Value = _timeProvider.GetUtcNow() });
+                var batchCommand = CreateSetMultipleBatchCommand(
+                    _dbRawCommands.SetMultipleSql,
+                    entry.Key,
+                    entry.Value,
+                    relativeInterval,
+                    entry.SlidingExpiration,
+                    null,
+                    now);
 
                 batch.BatchCommands.Add(batchCommand);
             }
@@ -1332,14 +1370,14 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
             var serializedBytes = entry.SerializedData.ToArray();
 
             // Try to deserialize as the requested type via configured serializer
-            var value = _entryFactory.Deserialize<T>(serializedBytes);
+            var value = _entryHelper.Deserialize<T>(serializedBytes);
             if (value == null)
             {
                 _logger.LogDeserializationError(key, typeof(T).Name, null);
                 return null;
             }
 
-            return _entryFactory.FromSerializedData<T>(
+            return _entryHelper.FromSerializedData<T>(
                 key,
                 serializedBytes,
                 entry.AbsoluteExpiration,
@@ -1362,7 +1400,7 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
                     // Strict UTF-8 decoding (fail on invalid bytes)
                     var enc = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
                     var str = enc.GetString(entry.SerializedData.Span);
-                    var compat = _entryFactory.Create<string>(
+                    var compat = _entryHelper.Create<string>(
                         key,
                         str,
                         entry.AbsoluteExpiration,
@@ -1399,7 +1437,7 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
                 var serializedBytes = kvp.Value.SerializedData.ToArray();
 
 #pragma warning disable CS8714 
-                var value = _entryFactory.Deserialize<T>(serializedBytes);
+                var value = _entryHelper.Deserialize<T>(serializedBytes);
 #pragma warning restore CS8714 
                 if (value == null)
                 {
@@ -1408,7 +1446,7 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
                     continue;
                 }
 
-                result[kvp.Key] = _entryFactory.FromSerializedData<T>(
+                result[kvp.Key] = _entryHelper.FromSerializedData<T>(
                     kvp.Key,
                     serializedBytes,
                     kvp.Value.AbsoluteExpiration,
@@ -1481,7 +1519,7 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
         }
 
         await ExecuteWithResilienceAsync(
-            SetEntryAsyncCore(_entryFactory.Create<T>(key, value, absoluteExpiration, slidingExpiration), token),
+            SetEntryAsyncCore(_entryHelper.Create<T>(key, value, absoluteExpiration, slidingExpiration), token),
             "SetEntryAsync<T>",
             key);
     }
@@ -1522,10 +1560,10 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
             {
                 // If SerializedData is empty, we need to serialize the Value first
                 var entryToStore = e.SerializedData.IsEmpty
-                    ? _entryFactory.Create(e.Key, e.Value, e.AbsoluteExpiration, e.SlidingExpiration)
+                    ? _entryHelper.Create(e.Key, e.Value, e.AbsoluteExpiration, e.SlidingExpiration)
                     : e;
 
-                return _entryFactory.FromSerializedData<byte[]>(
+                return _entryHelper.FromSerializedData<byte[]>(
                     entryToStore.Key, entryToStore.SerializedData.ToArray(),
                     entryToStore.AbsoluteExpiration, entryToStore.SlidingExpiration, entryToStore.BaseType);
             }).ToArray(), token),
@@ -1541,7 +1579,7 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
         ArgumentNullException.ThrowIfNull(entries);
 
         await ExecuteWithResilienceAsync(
-            SetMultipleEntriesAsync(entries.Select(e => _entryFactory.Create<T>(e.Key, e.Value.value, e.Value.options?.AbsoluteExpiration, e.Value.options?.SlidingExpiration)).ToArray(), token),
+            SetMultipleEntriesAsync(entries.Select(e => _entryHelper.Create<T>(e.Key, e.Value.value, e.Value.options?.AbsoluteExpiration, e.Value.options?.SlidingExpiration)).ToArray(), token),
             "SetMultipleEntriesAsync<T>");
     }
 
@@ -1556,8 +1594,8 @@ public class GlacialCachePostgreSQL : IGlacialCache, IDisposable
 
         _disposed = true;
 
-        // Dispose the options change token to prevent memory leaks
-        _optionsChangeToken?.Dispose();
+        _runtimeConfigurationSubscription.Dispose();
+        _ownedRuntimeConfigurationPublisher?.Dispose();
 
         _dataSource.Dispose();
         GC.SuppressFinalize(this);

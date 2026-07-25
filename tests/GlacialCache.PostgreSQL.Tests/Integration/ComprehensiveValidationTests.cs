@@ -1,5 +1,6 @@
 using System.Linq;
 using GlacialCache.PostgreSQL.Abstractions;
+using GlacialCache.PostgreSQL.Configuration;
 using GlacialCache.PostgreSQL.Extensions;
 using GlacialCache.PostgreSQL.Models;
 using GlacialCache.PostgreSQL.Services;
@@ -53,6 +54,7 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
                 options.Connection.ConnectionString = new NpgsqlConnectionStringBuilder(_postgres.GetConnectionString()) { ApplicationName = GetType().Name }.ConnectionString;
                 options.Cache.DefaultSlidingExpiration = TimeSpan.FromMinutes(10);
                 options.Cache.DefaultAbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);
+                options.Cache.Serializer = SerializerType.MemoryPack;
                 options.Infrastructure.EnableManagerElection = false;
                 options.Infrastructure.CreateInfrastructure = true;
             });

@@ -204,6 +204,23 @@ public sealed class TimeConverterServiceTests
         result.ShouldBe(TimeSpan.FromHours(1));
     }
 
+    [Fact]
+    public void ConvertToRelativeInterval_WithExplicitCurrentTime_UsesProvidedCurrentTime()
+    {
+        // Arrange
+        var timeProviderNow = new DateTimeOffset(2025, 1, 1, 12, 5, 0, TimeSpan.Zero);
+        var operationNow = new DateTimeOffset(2025, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var absoluteExpiration = operationNow.AddMinutes(30);
+
+        SetupTimeProvider(timeProviderNow);
+
+        // Act
+        var result = _service.ConvertToRelativeInterval(absoluteExpiration, operationNow);
+
+        // Assert
+        result.ShouldBe(TimeSpan.FromMinutes(30));
+    }
+
     #endregion
 
     #region Very Short Intervals
@@ -282,6 +299,42 @@ public sealed class TimeConverterServiceTests
 
         // Assert
         result.ShouldBe(customMinimum);
+    }
+
+    [Fact]
+    public void ConvertToRelativeInterval_UsesLatestOptionsFromMonitor()
+    {
+        // Arrange
+        var currentTime = new DateTimeOffset(2025, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var currentOptions = new GlacialCachePostgreSQLOptions
+        {
+            Cache = new CacheOptions
+            {
+                MinimumExpirationInterval = TimeSpan.FromMilliseconds(1),
+                MaximumExpirationInterval = TimeSpan.FromDays(365),
+                EnableEdgeCaseLogging = true
+            }
+        };
+        var mockOptions = new Mock<IOptionsMonitor<GlacialCachePostgreSQLOptions>>();
+        mockOptions.Setup(x => x.CurrentValue).Returns(() => currentOptions);
+
+        var service = new TimeConverterService(_mockLogger.Object, _mockTimeProvider.Object, mockOptions.Object);
+
+        currentOptions = new GlacialCachePostgreSQLOptions
+        {
+            Cache = new CacheOptions
+            {
+                MinimumExpirationInterval = TimeSpan.FromMilliseconds(100),
+                MaximumExpirationInterval = TimeSpan.FromDays(365),
+                EnableEdgeCaseLogging = true
+            }
+        };
+
+        // Act
+        var result = service.ConvertToRelativeInterval(currentTime.AddMilliseconds(10), currentTime);
+
+        // Assert
+        result.ShouldBe(TimeSpan.FromMilliseconds(100));
     }
 
 

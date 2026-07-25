@@ -14,7 +14,7 @@ internal sealed class TimeConverterService : ITimeConverterService
 {
     private readonly ILogger<TimeConverterService> _logger;
     private readonly TimeProvider _timeProvider;
-    private readonly CacheOptions _cacheOptions;
+    private readonly IOptionsMonitor<GlacialCachePostgreSQLOptions> _options;
 
     public TimeConverterService(
         ILogger<TimeConverterService> logger,
@@ -24,59 +24,64 @@ internal sealed class TimeConverterService : ITimeConverterService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         ArgumentNullException.ThrowIfNull(options);
-        _cacheOptions = options.CurrentValue.Cache;
+        _options = options;
     }
 
     public TimeSpan? ConvertToRelativeInterval(DateTimeOffset? absoluteExpiration)
+    {
+        return ConvertToRelativeInterval(absoluteExpiration, _timeProvider.GetUtcNow());
+    }
+
+    public TimeSpan? ConvertToRelativeInterval(DateTimeOffset? absoluteExpiration, DateTimeOffset now)
     {
         if (!absoluteExpiration.HasValue)
         {
             return null; // No expiration
         }
 
-        var now = _timeProvider.GetUtcNow();
+        var cacheOptions = _options.CurrentValue.Cache;
         var relativeInterval = absoluteExpiration.Value - now;
 
         // Handle past times - convert to immediate expiration
         if (relativeInterval <= TimeSpan.Zero)
         {
-            if (_cacheOptions.EnableEdgeCaseLogging)
+            if (cacheOptions.EnableEdgeCaseLogging)
             {
                 _logger.LogWarning(
                     "Absolute expiration time {AbsoluteExpiration} is in the past (current time: {CurrentTime}). Converting to immediate expiration.",
                     absoluteExpiration.Value, now);
             }
-            return _cacheOptions.MinimumExpirationInterval; // Configurable immediate expiration
+            return cacheOptions.MinimumExpirationInterval; // Configurable immediate expiration
         }
 
         // Handle very short intervals
-        if (relativeInterval < _cacheOptions.MinimumExpirationInterval)
+        if (relativeInterval < cacheOptions.MinimumExpirationInterval)
         {
-            if (_cacheOptions.EnableEdgeCaseLogging)
+            if (cacheOptions.EnableEdgeCaseLogging)
             {
                 _logger.LogWarning(
                     "Relative interval {RelativeInterval} is shorter than minimum allowed interval {MinimumInterval}. Clamping to minimum.",
-                    relativeInterval, _cacheOptions.MinimumExpirationInterval);
+                    relativeInterval, cacheOptions.MinimumExpirationInterval);
             }
-            return _cacheOptions.MinimumExpirationInterval;
+            return cacheOptions.MinimumExpirationInterval;
         }
 
         // Handle very long intervals
-        if (relativeInterval > _cacheOptions.MaximumExpirationInterval)
+        if (relativeInterval > cacheOptions.MaximumExpirationInterval)
         {
-            if (_cacheOptions.EnableEdgeCaseLogging)
+            if (cacheOptions.EnableEdgeCaseLogging)
             {
                 _logger.LogWarning(
                     "Relative interval {RelativeInterval} exceeds maximum allowed interval {MaximumInterval}. Clamping to maximum.",
-                    relativeInterval, _cacheOptions.MaximumExpirationInterval);
+                    relativeInterval, cacheOptions.MaximumExpirationInterval);
             }
-            return _cacheOptions.MaximumExpirationInterval;
+            return cacheOptions.MaximumExpirationInterval;
         }
 
         // Handle edge case: extremely small positive intervals that might cause issues
         if (relativeInterval.TotalMilliseconds < 10)
         {
-            if (_cacheOptions.EnableEdgeCaseLogging)
+            if (cacheOptions.EnableEdgeCaseLogging)
             {
                 _logger.LogInformation(
                     "Very small relative interval detected: {RelativeInterval}. This may cause rapid expiration.",

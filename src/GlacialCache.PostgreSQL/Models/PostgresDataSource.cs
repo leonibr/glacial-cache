@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using System.ComponentModel;
@@ -6,13 +7,18 @@ using System.ComponentModel;
 namespace GlacialCache.PostgreSQL.Models;
 
 using Configuration;
-using Extensions;
 
 internal interface IPostgreSQLDataSource : IDisposable
 {
     // NpgsqlDataSource DataSource { get; }
     ValueTask<NpgsqlConnection> GetConnectionAsync(CancellationToken token = default);
     ConnectionPoolMetrics GetPoolMetrics();
+}
+
+internal interface IPostgreSQLDataSourceHandle : IDisposable
+{
+    string ConnectionString { get; }
+    ValueTask<NpgsqlConnection> OpenConnectionAsync(CancellationToken token = default);
 }
 
 /// <summary>
@@ -28,28 +34,149 @@ public record ConnectionPoolMetrics
     public bool PoolingEnabled { get; init; }
 }
 
-internal sealed class PostgreSQLDataSource : IPostgreSQLDataSource
+internal sealed record PostgreSQLDataSourceSettings(
+    string ConnectionString,
+    int MinPoolSize,
+    int MaxPoolSize,
+    int IdleLifetime,
+    int PruningInterval,
+    string ApplicationName,
+    bool PoolingEnabled)
+{
+    public static PostgreSQLDataSourceSettings FromOptions(GlacialCachePostgreSQLOptions options)
+    {
+        var connectionString = !string.IsNullOrWhiteSpace(options.Connection.ConnectionStringObservable.Value)
+            ? options.Connection.ConnectionStringObservable.Value
+            : options.Connection.ConnectionString;
+
+        var builder = new NpgsqlConnectionStringBuilder(connectionString)
+        {
+            Pooling = true
+        };
+
+        var minPoolSize = GetPoolOption(options.Connection.Pool.MinSizeObservable, options.Connection.Pool.MinSize);
+        var maxPoolSize = GetPoolOption(options.Connection.Pool.MaxSizeObservable, options.Connection.Pool.MaxSize);
+        var idleLifetime = GetPoolOption(options.Connection.Pool.IdleLifetimeSecondsObservable, options.Connection.Pool.IdleLifetimeSeconds);
+        var pruningInterval = GetPoolOption(options.Connection.Pool.PruningIntervalSecondsObservable, options.Connection.Pool.PruningIntervalSeconds);
+
+        builder.MinPoolSize = builder.MinPoolSize != 0 ? builder.MinPoolSize : minPoolSize;
+        builder.MaxPoolSize = builder.MaxPoolSize != 100 ? builder.MaxPoolSize : maxPoolSize;
+        builder.ConnectionIdleLifetime = idleLifetime;
+        builder.ConnectionPruningInterval = pruningInterval;
+        builder.ApplicationName = string.IsNullOrEmpty(builder.ApplicationName) ? "GlacialCache" : builder.ApplicationName;
+
+        return new PostgreSQLDataSourceSettings(
+            builder.ConnectionString,
+            builder.MinPoolSize,
+            builder.MaxPoolSize,
+            builder.ConnectionIdleLifetime,
+            builder.ConnectionPruningInterval,
+            builder.ApplicationName ?? string.Empty,
+            builder.Pooling);
+    }
+
+    private static int GetPoolOption(ObservableProperty<int> observable, int configuredValue)
+    {
+        var observableValue = observable.Value;
+        return observableValue != default ? observableValue : configuredValue;
+    }
+}
+
+internal sealed class NpgsqlDataSourceHandle : IPostgreSQLDataSourceHandle
+{
+    private readonly NpgsqlDataSource _dataSource;
+
+    public NpgsqlDataSourceHandle(NpgsqlDataSource dataSource)
+    {
+        _dataSource = dataSource;
+    }
+
+    public string ConnectionString => _dataSource.ConnectionString;
+
+    public ValueTask<NpgsqlConnection> OpenConnectionAsync(CancellationToken token = default) =>
+        _dataSource.OpenConnectionAsync(token);
+
+    public void Dispose() => _dataSource.Dispose();
+}
+
+internal sealed class PostgreSQLDataSource : IPostgreSQLDataSource, IRuntimeConfigurationSubscriber
 {
     private readonly ILogger<PostgreSQLDataSource> _logger;
-    private readonly IOptionsMonitor<GlacialCachePostgreSQLOptions> _optionsMonitor;
-    private readonly IDisposable? _optionsChangeToken;
+    private readonly GlacialCachePostgreSQLOptions _observableOptions;
+    private readonly IDisposable _runtimeConfigurationSubscription;
+    private readonly IRuntimeConfigurationPublisher? _ownedRuntimeConfigurationPublisher;
+    private readonly Func<PostgreSQLDataSourceSettings, IPostgreSQLDataSourceHandle> _dataSourceFactory;
+    private readonly object _syncRoot = new();
     private GlacialCachePostgreSQLOptions _options;
-    private string _connectionString;
-    private NpgsqlDataSource? _dataSource;
+    private PostgreSQLDataSourceSettings _settings;
+    private ActiveDataSource? _dataSource;
     private bool _disposed;
 
     public PostgreSQLDataSource(
         ILogger<PostgreSQLDataSource> logger,
         IOptionsMonitor<GlacialCachePostgreSQLOptions> options)
+        : this(
+            logger,
+            options,
+            new RuntimeConfigurationPublisher(
+                options,
+                new ObservableOptionsSynchronizer(),
+                NullLogger<RuntimeConfigurationPublisher>.Instance),
+            CreateDataSource,
+            ownsRuntimeConfigurationPublisher: true)
+    {
+    }
+
+    internal PostgreSQLDataSource(
+        ILogger<PostgreSQLDataSource> logger,
+        IOptionsMonitor<GlacialCachePostgreSQLOptions> options,
+        Func<PostgreSQLDataSourceSettings, IPostgreSQLDataSourceHandle> dataSourceFactory)
+        : this(
+            logger,
+            options,
+            new RuntimeConfigurationPublisher(
+                options,
+                new ObservableOptionsSynchronizer(),
+                NullLogger<RuntimeConfigurationPublisher>.Instance),
+            dataSourceFactory,
+            ownsRuntimeConfigurationPublisher: true)
+    {
+    }
+
+    internal PostgreSQLDataSource(
+        ILogger<PostgreSQLDataSource> logger,
+        IOptionsMonitor<GlacialCachePostgreSQLOptions> options,
+        IRuntimeConfigurationPublisher runtimeConfigurationPublisher)
+        : this(logger, options, runtimeConfigurationPublisher, CreateDataSource, ownsRuntimeConfigurationPublisher: false)
+    {
+    }
+
+    internal PostgreSQLDataSource(
+        ILogger<PostgreSQLDataSource> logger,
+        IOptionsMonitor<GlacialCachePostgreSQLOptions> options,
+        IRuntimeConfigurationPublisher runtimeConfigurationPublisher,
+        Func<PostgreSQLDataSourceSettings, IPostgreSQLDataSourceHandle> dataSourceFactory)
+        : this(logger, options, runtimeConfigurationPublisher, dataSourceFactory, ownsRuntimeConfigurationPublisher: false)
+    {
+    }
+
+    private PostgreSQLDataSource(
+        ILogger<PostgreSQLDataSource> logger,
+        IOptionsMonitor<GlacialCachePostgreSQLOptions> options,
+        IRuntimeConfigurationPublisher runtimeConfigurationPublisher,
+        Func<PostgreSQLDataSourceSettings, IPostgreSQLDataSourceHandle> dataSourceFactory,
+        bool ownsRuntimeConfigurationPublisher)
     {
         _logger = logger;
-        _optionsMonitor = options;
         _options = options.CurrentValue;
+        _observableOptions = _options;
+        _dataSourceFactory = dataSourceFactory;
+        _ownedRuntimeConfigurationPublisher = ownsRuntimeConfigurationPublisher ? runtimeConfigurationPublisher : null;
 
-        _connectionString = options.CurrentValue.Connection.ConnectionString;
-        _dataSource = new NpgsqlDataSourceBuilder(_connectionString).Build();
-
-        InitializeFromOptions(options.CurrentValue);
+        _options.Connection.SetLogger(_logger);
+        _settings = PostgreSQLDataSourceSettings.FromOptions(_options);
+        _dataSource = new ActiveDataSource(_dataSourceFactory(_settings));
+        LogDataSourceConfigured(_settings);
 
         // Register for observable property changes to keep data source synchronized
         _options.Connection.ConnectionStringObservable.PropertyChanged += OnConnectionStringChanged;
@@ -58,30 +185,20 @@ internal sealed class PostgreSQLDataSource : IPostgreSQLDataSource
         _options.Connection.Pool.IdleLifetimeSecondsObservable.PropertyChanged += OnPoolPropertyChanged;
         _options.Connection.Pool.PruningIntervalSecondsObservable.PropertyChanged += OnPoolPropertyChanged;
 
-        // Register for external configuration changes (IOptionsMonitor pattern)
-        _optionsChangeToken = _optionsMonitor.OnChange(OnExternalConfigurationChanged);
+        _runtimeConfigurationSubscription = runtimeConfigurationPublisher.Subscribe(this);
     }
 
-    /// <summary>
-    /// Handles external configuration changes from IOptionsMonitor and syncs to observable properties.
-    /// </summary>
-    private void OnExternalConfigurationChanged(GlacialCachePostgreSQLOptions newOptions)
+    private static IPostgreSQLDataSourceHandle CreateDataSource(PostgreSQLDataSourceSettings settings)
     {
-        try
-        {
-            // Use extension method to sync observable properties for Connection and Pool
-            _options.Connection.SyncFromExternalChanges(newOptions.Connection, _logger);
-            _options.Connection.Pool.SyncFromExternalChanges(newOptions.Connection.Pool, _logger);
+        var dataSourceBuilder = new NpgsqlDataSourceBuilder(settings.ConnectionString);
+        return new NpgsqlDataSourceHandle(dataSourceBuilder.Build());
+    }
 
-            // Update our internal reference
-            _options = newOptions;
-
-            _logger.LogDebug("External configuration changes synchronized to observable properties");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to sync external configuration changes");
-        }
+    public void OnRuntimeConfigurationChanged(GlacialCachePostgreSQLOptions options)
+    {
+        _options = options;
+        TryUpdateDataSource(_observableOptions);
+        _logger.LogDebug("Runtime configuration changes synchronized to PostgreSQL data source");
     }
 
     private string MaskConnectionString(string connectionString, Configuration.Security.ConnectionStringOptions securityOptions)
@@ -140,103 +257,131 @@ internal sealed class PostgreSQLDataSource : IPostgreSQLDataSource
 
     private void OnConnectionStringChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (RuntimeConfigurationReloadScope.IsActive)
+        {
+            return;
+        }
+
         if (e is PropertyChangedEventArgs<string> typedArgs)
         {
             var maskedOldValue = MaskConnectionString(typedArgs.OldValue, _options.Security.ConnectionString);
             var maskedNewValue = MaskConnectionString(typedArgs.NewValue, _options.Security.ConnectionString);
 
             _logger.LogDebug("Connection string changed from {OldValue} to {NewValue}", maskedOldValue, maskedNewValue);
-            ReloadFromConnectionString(typedArgs.NewValue);
+            TryUpdateDataSource(_observableOptions);
         }
     }
 
     private void OnPoolPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (RuntimeConfigurationReloadScope.IsActive)
+        {
+            return;
+        }
+
         _logger.LogDebug("Connection pool property changed: {PropertyName}", e.PropertyName);
-        ReloadFromOptions(_options);
+        TryUpdateDataSource(_observableOptions);
     }
 
-    private void InitializeFromOptions(GlacialCachePostgreSQLOptions options)
+    private bool TryUpdateDataSource(GlacialCachePostgreSQLOptions options)
     {
-        UpdateDataSource(options);
-    }
-
-    private void ReloadFromConnectionString(string newConnectionString)
-    {
-        if (!_connectionString.Equals(newConnectionString))
+        PostgreSQLDataSourceSettings candidateSettings;
+        try
         {
-            UpdateDataSource(_options);
+            candidateSettings = PostgreSQLDataSourceSettings.FromOptions(options);
         }
-    }
-
-    private void ReloadFromOptions(GlacialCachePostgreSQLOptions options)
-    {
-        var hasChanged = DetectChanges(options);
-
-        if (hasChanged)
+        catch (Exception ex)
         {
-            UpdateDataSource(options);
+            _logger.LogError(ex, "Failed to create PostgreSQL data source settings from configuration");
+            return false;
         }
+
+        return TryUpdateDataSource(candidateSettings);
     }
 
-    private bool DetectChanges(GlacialCachePostgreSQLOptions options)
+    private bool TryUpdateDataSource(PostgreSQLDataSourceSettings candidateSettings)
     {
-        return !_connectionString.Equals(options.Connection.ConnectionString);
-    }
-
-    private void UpdateDataSource(GlacialCachePostgreSQLOptions options)
-    {
-        var dataSourceBuilder = new NpgsqlDataSourceBuilder(options.Connection.ConnectionString)
+        PostgreSQLDataSourceSettings previousSettings;
+        lock (_syncRoot)
         {
-            ConnectionStringBuilder =
+            if (_disposed)
             {
-                Pooling = true
+                return false;
             }
-        };
 
-        // Use provided options or fall back to defaults
-        var minPoolSize = options?.Connection.Pool.MinSize ?? 5;
-        var maxPoolSize = options?.Connection.Pool.MaxSize ?? 50;
-        var idleLifetime = options?.Connection.Pool.IdleLifetimeSeconds ?? 300;
-        var pruningInterval = options?.Connection.Pool.PruningIntervalSeconds ?? 10;
+            previousSettings = _settings;
+            if (candidateSettings == previousSettings)
+            {
+                return false;
+            }
+        }
 
-        // Apply pool size settings (only if not already set in connection string)
-        dataSourceBuilder.ConnectionStringBuilder.MinPoolSize =
-            dataSourceBuilder.ConnectionStringBuilder.MinPoolSize != 0 ? dataSourceBuilder.ConnectionStringBuilder.MinPoolSize : minPoolSize;
-        dataSourceBuilder.ConnectionStringBuilder.MaxPoolSize =
-            dataSourceBuilder.ConnectionStringBuilder.MaxPoolSize != 100 ? dataSourceBuilder.ConnectionStringBuilder.MaxPoolSize : maxPoolSize;
+        IPostgreSQLDataSourceHandle replacementDataSource;
+        try
+        {
+            replacementDataSource = _dataSourceFactory(candidateSettings);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to build replacement PostgreSQL data source");
+            return false;
+        }
 
-        // Apply connection lifetime settings
-        dataSourceBuilder.ConnectionStringBuilder.ConnectionIdleLifetime = idleLifetime;
-        dataSourceBuilder.ConnectionStringBuilder.ConnectionPruningInterval = pruningInterval;
+        ActiveDataSource replacementState = new(replacementDataSource);
+        IPostgreSQLDataSourceHandle? dataSourceToDispose;
+        lock (_syncRoot)
+        {
+            if (_disposed)
+            {
+                replacementDataSource.Dispose();
+                return false;
+            }
 
-        // Set application name for monitoring
-        dataSourceBuilder.ConnectionStringBuilder.ApplicationName =
-            string.IsNullOrEmpty(dataSourceBuilder.ConnectionStringBuilder.ApplicationName) ? "GlacialCache" : dataSourceBuilder.ConnectionStringBuilder.ApplicationName;
+            if (_settings != previousSettings)
+            {
+                replacementDataSource.Dispose();
+                return false;
+            }
 
-        _dataSource = dataSourceBuilder.Build();
-        _connectionString = options!.Connection.ConnectionString;
+            var replacedDataSource = _dataSource;
+            _dataSource = replacementState;
+            _settings = candidateSettings;
+            dataSourceToDispose = RetireDataSource(replacedDataSource);
+        }
 
+        dataSourceToDispose?.Dispose();
+        LogDataSourceConfigured(candidateSettings);
+
+        return true;
+    }
+
+    private void LogDataSourceConfigured(PostgreSQLDataSourceSettings settings)
+    {
         _logger.LogInformation(
             "PostgreSQL connection pool configured: MinSize={MinPoolSize}, MaxSize={MaxPoolSize}, IdleLifetime={IdleLifetime}s, PruningInterval={PruningInterval}s",
-            dataSourceBuilder.ConnectionStringBuilder.MinPoolSize,
-            dataSourceBuilder.ConnectionStringBuilder.MaxPoolSize,
-            idleLifetime,
-            pruningInterval);
+            settings.MinPoolSize,
+            settings.MaxPoolSize,
+            settings.IdleLifetime,
+            settings.PruningInterval);
     }
 
     public async ValueTask<NpgsqlConnection> GetConnectionAsync(CancellationToken token = default)
     {
-        if (_dataSource == null)
+        using var lease = TryAcquireDataSourceLease();
+
+        if (lease == null)
         {
             throw new InvalidOperationException("DataSource has not been initialized.");
         }
-        return await _dataSource.OpenConnectionAsync(token).ConfigureAwait(false);
+
+        return await lease.DataSource.OpenConnectionAsync(token).ConfigureAwait(false);
     }
 
     public ConnectionPoolMetrics GetPoolMetrics()
     {
-        if (_dataSource is not NpgsqlDataSource dataSource)
+        using var lease = TryAcquireDataSourceLease();
+
+        if (lease == null)
         {
             return new ConnectionPoolMetrics
             {
@@ -249,7 +394,7 @@ internal sealed class PostgreSQLDataSource : IPostgreSQLDataSource
             };
         }
 
-        var connectionString = dataSource.ConnectionString;
+        var connectionString = lease.DataSource.ConnectionString;
         var builder = new NpgsqlConnectionStringBuilder(connectionString);
 
         return new ConnectionPoolMetrics
@@ -265,21 +410,108 @@ internal sealed class PostgreSQLDataSource : IPostgreSQLDataSource
 
     public void Dispose()
     {
-        if (!_disposed)
+        IPostgreSQLDataSourceHandle? dataSourceToDispose;
+        lock (_syncRoot)
         {
+            if (_disposed)
+            {
+                return;
+            }
+
             _disposed = true;
+            var dataSource = _dataSource;
+            _dataSource = null;
+            dataSourceToDispose = RetireDataSource(dataSource);
+        }
 
-            // Unregister observable property change handlers to prevent memory leaks
-            _options.Connection.ConnectionStringObservable.PropertyChanged -= OnConnectionStringChanged;
-            _options.Connection.Pool.MinSizeObservable.PropertyChanged -= OnPoolPropertyChanged;
-            _options.Connection.Pool.MaxSizeObservable.PropertyChanged -= OnPoolPropertyChanged;
-            _options.Connection.Pool.IdleLifetimeSecondsObservable.PropertyChanged -= OnPoolPropertyChanged;
-            _options.Connection.Pool.PruningIntervalSecondsObservable.PropertyChanged -= OnPoolPropertyChanged;
+        // Unregister observable property change handlers to prevent memory leaks
+        _observableOptions.Connection.ConnectionStringObservable.PropertyChanged -= OnConnectionStringChanged;
+        _observableOptions.Connection.Pool.MinSizeObservable.PropertyChanged -= OnPoolPropertyChanged;
+        _observableOptions.Connection.Pool.MaxSizeObservable.PropertyChanged -= OnPoolPropertyChanged;
+        _observableOptions.Connection.Pool.IdleLifetimeSecondsObservable.PropertyChanged -= OnPoolPropertyChanged;
+        _observableOptions.Connection.Pool.PruningIntervalSecondsObservable.PropertyChanged -= OnPoolPropertyChanged;
 
-            // Dispose the options change token to prevent memory leaks
-            _optionsChangeToken?.Dispose();
+        _runtimeConfigurationSubscription.Dispose();
+        _ownedRuntimeConfigurationPublisher?.Dispose();
 
-            _dataSource?.Dispose();
+        dataSourceToDispose?.Dispose();
+    }
+
+    private DataSourceLease? TryAcquireDataSourceLease()
+    {
+        lock (_syncRoot)
+        {
+            if (_dataSource == null)
+            {
+                return null;
+            }
+
+            _dataSource.LeaseCount++;
+            return new DataSourceLease(this, _dataSource);
+        }
+    }
+
+    private static IPostgreSQLDataSourceHandle? RetireDataSource(ActiveDataSource? dataSource)
+    {
+        if (dataSource == null)
+        {
+            return null;
+        }
+
+        dataSource.Retired = true;
+        return dataSource.LeaseCount == 0 ? dataSource.Handle : null;
+    }
+
+    private void ReleaseDataSourceLease(ActiveDataSource dataSource)
+    {
+        IPostgreSQLDataSourceHandle? dataSourceToDispose = null;
+        lock (_syncRoot)
+        {
+            dataSource.LeaseCount--;
+            if (dataSource.LeaseCount == 0 && dataSource.Retired)
+            {
+                dataSourceToDispose = dataSource.Handle;
+            }
+        }
+
+        dataSourceToDispose?.Dispose();
+    }
+
+    private sealed class ActiveDataSource
+    {
+        public ActiveDataSource(IPostgreSQLDataSourceHandle handle)
+        {
+            Handle = handle;
+        }
+
+        public IPostgreSQLDataSourceHandle Handle { get; }
+        public int LeaseCount { get; set; }
+        public bool Retired { get; set; }
+    }
+
+    private sealed class DataSourceLease : IDisposable
+    {
+        private readonly PostgreSQLDataSource _owner;
+        private readonly ActiveDataSource _dataSource;
+        private bool _disposed;
+
+        public DataSourceLease(PostgreSQLDataSource owner, ActiveDataSource dataSource)
+        {
+            _owner = owner;
+            _dataSource = dataSource;
+        }
+
+        public IPostgreSQLDataSourceHandle DataSource => _dataSource.Handle;
+
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            _owner.ReleaseDataSourceLease(_dataSource);
         }
     }
 }

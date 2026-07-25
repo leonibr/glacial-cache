@@ -23,30 +23,49 @@ public static class ObservableOptionsExtensions
     {
         try
         {
-            // Use reflection to sync all ObservableProperty<T> properties
-            var properties = typeof(T).GetProperties()
-                .Where(p => p.PropertyType.IsGenericType &&
-                           p.PropertyType.GetGenericTypeDefinition() == typeof(ObservableProperty<>));
-
-            foreach (var prop in properties)
-            {
-                var currentObservable = prop.GetValue(current);
-                var newObservable = prop.GetValue(newOptions);
-
-                if (currentObservable != null && newObservable != null)
-                {
-                    var valueProperty = prop.PropertyType.GetProperty("Value");
-                    if (valueProperty != null)
-                    {
-                        var newValue = valueProperty.GetValue(newObservable);
-                        valueProperty.SetValue(currentObservable, newValue);
-                    }
-                }
-            }
+            SyncObservableProperties(current, newOptions);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to sync observable properties for {Type}", typeof(T).Name);
+        }
+    }
+
+    internal static void SyncFromExternalChangesOrThrow<T>(this T current, T newOptions, ILogger logger)
+        where T : class
+    {
+        try
+        {
+            SyncObservableProperties(current, newOptions);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to sync observable properties for {Type}", typeof(T).Name);
+            throw;
+        }
+    }
+
+    private static void SyncObservableProperties<T>(T current, T newOptions)
+        where T : class
+    {
+        var properties = typeof(T).GetProperties()
+            .Where(p => p.PropertyType.IsGenericType &&
+                       p.PropertyType.GetGenericTypeDefinition() == typeof(ObservableProperty<>));
+
+        foreach (var prop in properties)
+        {
+            var currentObservable = prop.GetValue(current);
+            var newObservable = prop.GetValue(newOptions);
+
+            if (currentObservable != null && newObservable != null)
+            {
+                var valueProperty = prop.PropertyType.GetProperty("Value");
+                if (valueProperty != null)
+                {
+                    var newValue = valueProperty.GetValue(newObservable);
+                    valueProperty.SetValue(currentObservable, newValue);
+                }
+            }
         }
     }
 }

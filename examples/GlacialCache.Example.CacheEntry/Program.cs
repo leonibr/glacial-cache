@@ -1,11 +1,11 @@
+using System.Diagnostics;
+using GlacialCache.PostgreSQL.Abstractions;
+using GlacialCache.PostgreSQL.Extensions;
+using GlacialCache.PostgreSQL.Models;
+using GlacialCache.PostgreSQL.Services;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using GlacialCache.PostgreSQL.Extensions;
-using GlacialCache.PostgreSQL.Abstractions;
-using GlacialCache.PostgreSQL.Models;
-using System.Diagnostics;
-using GlacialCache.PostgreSQL.Services;
 
 namespace GlacialCache.Example.CacheEntryExample;
 
@@ -60,8 +60,9 @@ class Program
         Console.WriteLine("🚀 GlacialCache PostgreSQL CacheEntry Example");
         Console.WriteLine("============================================");
 
+
         // Run CacheEntry examples
-        var cacheEntryExample = new CacheEntryExample(cache, serviceProvider.GetRequiredService<GlacialCacheEntryFactory>());
+        var cacheEntryExample = new CacheEntryExample(cache);
         await cacheEntryExample.RunExampleAsync();
 
         Console.WriteLine("\n🎉 All CacheEntry examples completed successfully!");

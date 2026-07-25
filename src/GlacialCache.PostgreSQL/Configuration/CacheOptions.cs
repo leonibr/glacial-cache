@@ -11,12 +11,12 @@ namespace GlacialCache.PostgreSQL.Configuration;
 public enum SerializerType
 {
     /// <summary>
-    /// MemoryPack serialization - fast binary serialization (default).
+    /// MemoryPack serialization - fast binary serialization.
     /// </summary>
     MemoryPack,
 
     /// <summary>
-    /// JSON serialization with UTF8 bytes - broader compatibility.
+    /// JSON serialization with UTF8 bytes - broader compatibility (default).
     /// </summary>
     JsonBytes,
 
@@ -107,9 +107,9 @@ public class CacheOptions
 
     /// <summary>
     /// Serializer to use for complex objects. Strings always use UTF8 optimization.
-    /// Default is MemoryPack for maximum performance.
+    /// Default is JsonBytes for broader compatibility.
     /// </summary>
-    public SerializerType Serializer { get; set; } = SerializerType.MemoryPack;
+    public SerializerType Serializer { get; set; } = SerializerType.JsonBytes;
 
     /// <summary>
     /// Custom serializer implementation. Required when Serializer is set to Custom.

@@ -16,13 +16,13 @@ namespace GlacialCache.PostgreSQL.Tests.UnitTests;
 public class SerializerConfigurationTests
 {
     [Fact]
-    public void Serializer_Default_ShouldBeMemoryPack()
+    public void Serializer_Default_ShouldBeJsonBytes()
     {
         // Arrange & Act
         var options = new CacheOptions();
 
         // Assert
-        options.Serializer.ShouldBe(SerializerType.MemoryPack);
+        options.Serializer.ShouldBe(SerializerType.JsonBytes);
     }
 
     [Fact]

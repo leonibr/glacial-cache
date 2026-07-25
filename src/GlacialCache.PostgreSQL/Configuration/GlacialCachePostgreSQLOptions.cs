@@ -119,6 +119,27 @@ public class GlacialCachePostgreSQLOptions : IOptions<GlacialCachePostgreSQLOpti
                 new[] { "Cache.SchemaName" }));
         }
 
+        if (Cache.MinimumExpirationInterval <= TimeSpan.Zero)
+        {
+            results.Add(new ValidationResult(
+                "Minimum expiration interval must be positive",
+                new[] { "Cache.MinimumExpirationInterval" }));
+        }
+
+        if (Cache.MaximumExpirationInterval <= TimeSpan.Zero)
+        {
+            results.Add(new ValidationResult(
+                "Maximum expiration interval must be positive",
+                new[] { "Cache.MaximumExpirationInterval" }));
+        }
+
+        if (Cache.MinimumExpirationInterval > Cache.MaximumExpirationInterval)
+        {
+            results.Add(new ValidationResult(
+                "Minimum expiration interval cannot be greater than maximum expiration interval",
+                new[] { "Cache.MinimumExpirationInterval", "Cache.MaximumExpirationInterval" }));
+        }
+
         return results;
     }
 

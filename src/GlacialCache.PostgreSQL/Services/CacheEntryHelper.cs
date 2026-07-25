@@ -4,18 +4,18 @@ using GlacialCache.PostgreSQL.Models;
 namespace GlacialCache.PostgreSQL.Services;
 
 /// <summary>
-/// Factory for creating CacheEntry instances with injected serialization properties.
+/// Helper for creating CacheEntry instances with injected serialization properties.
 /// </summary>
-public class GlacialCacheEntryFactory
+public sealed class CacheEntryHelper
 {
     private readonly ICacheEntrySerializer _serializer;
 
     /// <summary>
-    /// Initializes a new instance of the GlacialCacheEntryFactory class.
+    /// Initializes a new instance of the CacheEntryHelper class.
     /// </summary>
     /// <param name="serializer">The serializer to use for serialization operations.</param>
     /// <exception cref="ArgumentNullException">Thrown when serializer is null.</exception>
-    public GlacialCacheEntryFactory(ICacheEntrySerializer serializer)
+    public CacheEntryHelper(ICacheEntrySerializer serializer)
     {
         _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
     }

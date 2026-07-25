@@ -33,6 +33,16 @@ public static class ServiceCollectionExtensions
 
         // Register configuration services
         services.TryAddSingleton<IncrementalConfigurationValidator>();
+        services.TryAddSingleton<IObservableOptionsSynchronizer, ObservableOptionsSynchronizer>();
+        services.TryAddTransient<ILogger<RuntimeConfigurationPublisher>>(sp =>
+            sp.GetService<ILoggerFactory>()?.CreateLogger<RuntimeConfigurationPublisher>() ?? NullLogger<RuntimeConfigurationPublisher>.Instance);
+        services.TryAddSingleton<IRuntimeConfigurationPublisher>(sp =>
+        {
+            var options = sp.GetRequiredService<IOptionsMonitor<GlacialCachePostgreSQLOptions>>();
+            var synchronizer = sp.GetRequiredService<IObservableOptionsSynchronizer>();
+            var logger = sp.GetRequiredService<ILogger<RuntimeConfigurationPublisher>>();
+            return new RuntimeConfigurationPublisher(options, synchronizer, logger);
+        });
 
         // Register domain services that depend on configuration
         services.TryAddSingleton<IDbNomenclature>(sp =>
@@ -44,15 +54,17 @@ public static class ServiceCollectionExtensions
             // Initialize observable properties through SetLogger methods
             options.CurrentValue.Cache.SetLogger(logger);
             options.CurrentValue.Connection.SetLogger(logger);
+            var runtimeConfigurationPublisher = sp.GetRequiredService<IRuntimeConfigurationPublisher>();
 
-            return new DbNomenclature(options, logger);
+            return new DbNomenclature(options, logger, runtimeConfigurationPublisher);
         });
         services.TryAddSingleton<IDbRawCommands>(sp =>
         {
             var dbNomenclature = sp.GetRequiredService<IDbNomenclature>();
             var options = sp.GetRequiredService<IOptionsMonitor<GlacialCachePostgreSQLOptions>>();
             var logger = sp.GetService<ILoggerFactory>()?.CreateLogger<DbRawCommands>();
-            return new DbRawCommands(dbNomenclature, options, logger);
+            var runtimeConfigurationPublisher = sp.GetRequiredService<IRuntimeConfigurationPublisher>();
+            return new DbRawCommands(dbNomenclature, options, logger, runtimeConfigurationPublisher);
         });
         // Ensure ILogger<PostgreSQLDataSource> is available
         services.TryAddTransient<ILogger<PostgreSQLDataSource>>(sp =>
@@ -62,8 +74,9 @@ public static class ServiceCollectionExtensions
         {
             var logger = sp.GetRequiredService<ILogger<PostgreSQLDataSource>>();
             var options = sp.GetRequiredService<IOptionsMonitor<GlacialCachePostgreSQLOptions>>();
+            var runtimeConfigurationPublisher = sp.GetRequiredService<IRuntimeConfigurationPublisher>();
 
-            return new PostgreSQLDataSource(logger, options);
+            return new PostgreSQLDataSource(logger, options, runtimeConfigurationPublisher);
         });
 
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
@@ -81,7 +94,7 @@ public static class ServiceCollectionExtensions
                 _ => new MemoryPackCacheEntrySerializer(),
             };
         });
-        services.TryAddSingleton<GlacialCacheEntryFactory>();
+        services.TryAddSingleton<CacheEntryHelper>();
 
         // Ensure ILogger<TimeConverterService> is available
         services.TryAddTransient<ILogger<TimeConverterService>>(sp =>
@@ -103,8 +116,9 @@ public static class ServiceCollectionExtensions
             var ds = sp.GetRequiredService<IPostgreSQLDataSource>();
             var dbRawCommands = sp.GetRequiredService<IDbRawCommands>();
             var timeProvider = sp.GetRequiredService<TimeProvider>();
-            var entryFactory = sp.GetRequiredService<GlacialCacheEntryFactory>();
-            return new GlacialCachePostgreSQL(opts, logger, timeConverter, ds, dbRawCommands, sp, timeProvider, entryFactory);
+            var entryHelper = sp.GetRequiredService<CacheEntryHelper>();
+            var runtimeConfigurationPublisher = sp.GetRequiredService<IRuntimeConfigurationPublisher>();
+            return new GlacialCachePostgreSQL(opts, logger, timeConverter, ds, dbRawCommands, sp, timeProvider, entryHelper, runtimeConfigurationPublisher);
         });
 
         // Ensure ILogger<GlacialCachePostgreSQL> is available

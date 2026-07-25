@@ -29,17 +29,27 @@ public class JsonCacheEntrySerializer : ICacheEntrySerializer
     /// <returns>The serialized byte array.</returns>
     public byte[] Serialize<T>(T value) where T : notnull
     {
-        ArgumentNullException.ThrowIfNull(value);
-
         if (typeof(T) == typeof(string))
         {
+            if (value is null)
+            {
+                return Array.Empty<byte>();
+            }
+
             return Encoding.UTF8.GetBytes((string)(object)value);
         }
 
         if (typeof(T) == typeof(byte[]))
         {
+            if (value is null)
+            {
+                return Array.Empty<byte>();
+            }
+
             return (byte[])(object)value!;
         }
+
+        ArgumentNullException.ThrowIfNull(value);
 
         return JsonSerializer.SerializeToUtf8Bytes(value, HighPerformanceOptions);
     }

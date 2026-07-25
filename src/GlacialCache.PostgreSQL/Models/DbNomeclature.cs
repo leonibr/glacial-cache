@@ -1,17 +1,18 @@
 using System.ComponentModel;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace GlacialCache.PostgreSQL.Models;
 using Abstractions;
 using Configuration;
-using Extensions;
 
-internal sealed class DbNomenclature : IDbNomenclature, IDisposable
+internal sealed class DbNomenclature : IDbNomenclature, IRuntimeConfigurationSubscriber, IDisposable
 {
     private readonly ILogger<DbNomenclature> _logger;
-    private readonly IOptionsMonitor<GlacialCachePostgreSQLOptions> _optionsMonitor;
-    private readonly IDisposable? _optionsChangeToken;
+    private readonly GlacialCachePostgreSQLOptions _observableOptions;
+    private readonly IDisposable _runtimeConfigurationSubscription;
+    private readonly IRuntimeConfigurationPublisher? _ownedRuntimeConfigurationPublisher;
     private GlacialCachePostgreSQLOptions _options;
 
     /// <summary>
@@ -30,10 +31,35 @@ internal sealed class DbNomenclature : IDbNomenclature, IDisposable
     public string SchemaName { get; private set; } = string.Empty;
 
     internal DbNomenclature(IOptionsMonitor<GlacialCachePostgreSQLOptions> options, ILogger<DbNomenclature> logger)
+        : this(
+            options,
+            logger,
+            new RuntimeConfigurationPublisher(
+                options,
+                new ObservableOptionsSynchronizer(),
+                NullLogger<RuntimeConfigurationPublisher>.Instance),
+            ownsRuntimeConfigurationPublisher: true)
     {
-        _optionsMonitor = options;
+    }
+
+    internal DbNomenclature(
+        IOptionsMonitor<GlacialCachePostgreSQLOptions> options,
+        ILogger<DbNomenclature> logger,
+        IRuntimeConfigurationPublisher runtimeConfigurationPublisher)
+        : this(options, logger, runtimeConfigurationPublisher, ownsRuntimeConfigurationPublisher: false)
+    {
+    }
+
+    private DbNomenclature(
+        IOptionsMonitor<GlacialCachePostgreSQLOptions> options,
+        ILogger<DbNomenclature> logger,
+        IRuntimeConfigurationPublisher runtimeConfigurationPublisher,
+        bool ownsRuntimeConfigurationPublisher)
+    {
         _options = options.CurrentValue;
+        _observableOptions = _options;
         _logger = logger;
+        _ownedRuntimeConfigurationPublisher = ownsRuntimeConfigurationPublisher ? runtimeConfigurationPublisher : null;
 
         // Initialize from current values
         InitializeFromOptions(_options);
@@ -42,33 +68,23 @@ internal sealed class DbNomenclature : IDbNomenclature, IDisposable
         _options.Cache.TableNameObservable.PropertyChanged += OnTableNameChanged;
         _options.Cache.SchemaNameObservable.PropertyChanged += OnSchemaNameChanged;
 
-        // Register for external configuration changes (IOptionsMonitor pattern)
-        _optionsChangeToken = _optionsMonitor.OnChange(OnExternalConfigurationChanged);
+        _runtimeConfigurationSubscription = runtimeConfigurationPublisher.Subscribe(this);
     }
 
-    /// <summary>
-    /// Handles external configuration changes from IOptionsMonitor and syncs to observable properties.
-    /// </summary>
-    private void OnExternalConfigurationChanged(GlacialCachePostgreSQLOptions newOptions)
+    public void OnRuntimeConfigurationChanged(GlacialCachePostgreSQLOptions options)
     {
-        try
-        {
-            // Use extension method to sync observable properties
-            _options.Cache.SyncFromExternalChanges(newOptions.Cache, _logger);
-
-            // Update our internal reference
-            _options = newOptions;
-
-            _logger.LogDebug("External configuration changes synchronized to observable properties");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to sync external configuration changes");
-        }
+        _options = options;
+        UpdateFromObservableProperties();
+        _logger.LogDebug("Runtime configuration changes synchronized to nomenclature");
     }
 
     private void OnTableNameChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (RuntimeConfigurationReloadScope.IsActive)
+        {
+            return;
+        }
+
         if (e is PropertyChangedEventArgs<string> typedArgs)
         {
             _logger.LogDebug("Cache table name changed from {OldValue} to {NewValue}", typedArgs.OldValue, typedArgs.NewValue);
@@ -79,6 +95,11 @@ internal sealed class DbNomenclature : IDbNomenclature, IDisposable
 
     private void OnSchemaNameChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (RuntimeConfigurationReloadScope.IsActive)
+        {
+            return;
+        }
+
         if (e is PropertyChangedEventArgs<string> typedArgs)
         {
             _logger.LogDebug("Cache schema name changed from {OldValue} to {NewValue}", typedArgs.OldValue, typedArgs.NewValue);
@@ -90,8 +111,8 @@ internal sealed class DbNomenclature : IDbNomenclature, IDisposable
     private void UpdateFromObservableProperties()
     {
         // CacheOptions already validates and lowercases the values
-        TableName = _options.Cache.TableNameObservable.Value;
-        SchemaName = _options.Cache.SchemaNameObservable.Value;
+        TableName = _observableOptions.Cache.TableNameObservable.Value;
+        SchemaName = _observableOptions.Cache.SchemaNameObservable.Value;
         FullTableName = $"{SchemaName}.{TableName}";
     }
 
@@ -112,10 +133,10 @@ internal sealed class DbNomenclature : IDbNomenclature, IDisposable
     public void Dispose()
     {
         // Unregister observable property change handlers to prevent memory leaks
-        _options.Cache.TableNameObservable.PropertyChanged -= OnTableNameChanged;
-        _options.Cache.SchemaNameObservable.PropertyChanged -= OnSchemaNameChanged;
+        _observableOptions.Cache.TableNameObservable.PropertyChanged -= OnTableNameChanged;
+        _observableOptions.Cache.SchemaNameObservable.PropertyChanged -= OnSchemaNameChanged;
 
-        // Dispose the options change token to prevent memory leaks
-        _optionsChangeToken?.Dispose();
+        _runtimeConfigurationSubscription.Dispose();
+        _ownedRuntimeConfigurationPublisher?.Dispose();
     }
 }

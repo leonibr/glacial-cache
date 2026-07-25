@@ -140,9 +140,13 @@ public class GlacialCachePostgreSQL : IGlacialCache, IRuntimeConfigurationSubscr
         EnsureInitialized();
     }
 
-    public void OnRuntimeConfigurationChanged(GlacialCachePostgreSQLOptions options)
+    void IRuntimeConfigurationSubscriber.OnRuntimeConfigurationChanged(RuntimeConfigurationChangedEventArgs change)
     {
-        _options = options;
+        if (change.Options != null)
+        {
+            _options = change.Options;
+        }
+
         _logger.LogDebug("Runtime configuration changes synchronized to cache service");
     }
 

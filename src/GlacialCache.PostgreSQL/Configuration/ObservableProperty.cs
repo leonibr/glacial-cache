@@ -58,7 +58,10 @@ public class ObservableProperty<T> : INotifyPropertyChanged
                 try
                 {
                     // Log property change using established pattern
-                    _logger?.LogConfigurationPropertyChanged(_propertyName, oldValue, value);
+                    _logger?.LogConfigurationPropertyChanged(
+                        _propertyName,
+                        ConfigurationLogValueSanitizer.Sanitize(_propertyName, oldValue),
+                        ConfigurationLogValueSanitizer.Sanitize(_propertyName, value));
 
                     // Raise PropertyChanged event
                     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs<T>(oldValue, value, _propertyName));
@@ -112,4 +115,33 @@ public class ObservableProperty<T> : INotifyPropertyChanged
     /// Returns the hash code for the current value.
     /// </summary>
     public override int GetHashCode() => Value?.GetHashCode() ?? 0;
+}
+
+internal static class ConfigurationLogValueSanitizer
+{
+    private const string RedactedValue = "[Redacted sensitive configuration value]";
+
+    private static readonly string[] SensitivePropertyNameMarkers =
+    [
+        "ConnectionString",
+        "Password",
+        "Token",
+        "Key",
+        "Secret",
+        "Credential"
+    ];
+
+    public static object? Sanitize(string propertyName, object? value)
+    {
+        if (value == null || !IsSensitivePropertyName(propertyName))
+        {
+            return value;
+        }
+
+        return RedactedValue;
+    }
+
+    private static bool IsSensitivePropertyName(string propertyName) =>
+        SensitivePropertyNameMarkers.Any(marker =>
+            propertyName.Contains(marker, StringComparison.OrdinalIgnoreCase));
 }

@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 
 namespace GlacialCache.PostgreSQL.Services;
 using Configuration;
@@ -64,6 +65,13 @@ public static class ConfigurationValidator
         {
             var missing = string.Join(", ", missingParts);
             var errorMessage = $"Connection string is missing required parts: {missing}";
+            logger?.LogError("Connection string validation failed: {Error}", errorMessage);
+            throw new ArgumentException(errorMessage, nameof(connectionString));
+        }
+
+        if (!IsParsableConnectionString(connectionString))
+        {
+            const string errorMessage = "Connection string is malformed.";
             logger?.LogError("Connection string validation failed: {Error}", errorMessage);
             throw new ArgumentException(errorMessage, nameof(connectionString));
         }
@@ -207,6 +215,23 @@ public static class ConfigurationValidator
         return identifier.All(c => char.IsLetterOrDigit(c) || c == '_');
     }
 
+    private static bool IsParsableConnectionString(string connectionString)
+    {
+        try
+        {
+            _ = new NpgsqlConnectionStringBuilder(connectionString);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
     /// <summary>
     /// Validates options and returns validation results without throwing exceptions.
     /// </summary>
@@ -234,7 +259,26 @@ public static class ConfigurationValidator
         // Additional custom validations
         if (string.IsNullOrWhiteSpace(options.Connection.ConnectionString))
         {
-            yield return new ValidationResult("Connection string cannot be null or empty", new[] { nameof(options.Connection.ConnectionString) });
+            yield return new ValidationResult("Connection string cannot be null or empty", new[] { "Connection.ConnectionString" });
+        }
+        else
+        {
+            var requiredParts = new[] { "Host", "Database", "Username" };
+            var missingParts = requiredParts.Where(part =>
+                !options.Connection.ConnectionString.Contains($"{part}=", StringComparison.OrdinalIgnoreCase)).ToArray();
+
+            if (missingParts.Any())
+            {
+                yield return new ValidationResult(
+                    $"Connection string is missing required parts: {string.Join(", ", missingParts)}",
+                    new[] { "Connection.ConnectionString" });
+            }
+            else if (!IsParsableConnectionString(options.Connection.ConnectionString))
+            {
+                yield return new ValidationResult(
+                    "Connection string is malformed",
+                    new[] { "Connection.ConnectionString" });
+            }
         }
 
         if (!IsValidPostgreSqlIdentifier(options.Cache.TableName))

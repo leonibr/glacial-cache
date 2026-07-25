@@ -45,24 +45,20 @@ internal sealed record PostgreSQLDataSourceSettings(
 {
     public static PostgreSQLDataSourceSettings FromOptions(GlacialCachePostgreSQLOptions options)
     {
-        var connectionString = !string.IsNullOrWhiteSpace(options.Connection.ConnectionStringObservable.Value)
-            ? options.Connection.ConnectionStringObservable.Value
-            : options.Connection.ConnectionString;
+        return FromSnapshot(RuntimeConfigurationSnapshot.FromOptions(options).Connection);
+    }
 
-        var builder = new NpgsqlConnectionStringBuilder(connectionString)
+    public static PostgreSQLDataSourceSettings FromSnapshot(ConnectionRuntimeSnapshot snapshot)
+    {
+        var builder = new NpgsqlConnectionStringBuilder(snapshot.ConnectionString)
         {
             Pooling = true
         };
 
-        var minPoolSize = GetPoolOption(options.Connection.Pool.MinSizeObservable, options.Connection.Pool.MinSize);
-        var maxPoolSize = GetPoolOption(options.Connection.Pool.MaxSizeObservable, options.Connection.Pool.MaxSize);
-        var idleLifetime = GetPoolOption(options.Connection.Pool.IdleLifetimeSecondsObservable, options.Connection.Pool.IdleLifetimeSeconds);
-        var pruningInterval = GetPoolOption(options.Connection.Pool.PruningIntervalSecondsObservable, options.Connection.Pool.PruningIntervalSeconds);
-
-        builder.MinPoolSize = builder.MinPoolSize != 0 ? builder.MinPoolSize : minPoolSize;
-        builder.MaxPoolSize = builder.MaxPoolSize != 100 ? builder.MaxPoolSize : maxPoolSize;
-        builder.ConnectionIdleLifetime = idleLifetime;
-        builder.ConnectionPruningInterval = pruningInterval;
+        builder.MinPoolSize = snapshot.MinPoolSize;
+        builder.MaxPoolSize = snapshot.MaxPoolSize;
+        builder.ConnectionIdleLifetime = snapshot.IdleLifetimeSeconds;
+        builder.ConnectionPruningInterval = snapshot.PruningIntervalSeconds;
         builder.ApplicationName = string.IsNullOrEmpty(builder.ApplicationName) ? "GlacialCache" : builder.ApplicationName;
 
         return new PostgreSQLDataSourceSettings(
@@ -73,12 +69,6 @@ internal sealed record PostgreSQLDataSourceSettings(
             builder.ConnectionPruningInterval,
             builder.ApplicationName ?? string.Empty,
             builder.Pooling);
-    }
-
-    private static int GetPoolOption(ObservableProperty<int> observable, int configuredValue)
-    {
-        var observableValue = observable.Value;
-        return observableValue != default ? observableValue : configuredValue;
     }
 }
 
@@ -105,6 +95,7 @@ internal sealed class PostgreSQLDataSource : IPostgreSQLDataSource, IRuntimeConf
     private readonly GlacialCachePostgreSQLOptions _observableOptions;
     private readonly IDisposable _runtimeConfigurationSubscription;
     private readonly IRuntimeConfigurationPublisher? _ownedRuntimeConfigurationPublisher;
+    private readonly IRuntimeConfigurationSnapshotProvider _snapshotProvider;
     private readonly Func<PostgreSQLDataSourceSettings, IPostgreSQLDataSourceHandle> _dataSourceFactory;
     private readonly object _syncRoot = new();
     private GlacialCachePostgreSQLOptions _options;
@@ -170,11 +161,12 @@ internal sealed class PostgreSQLDataSource : IPostgreSQLDataSource, IRuntimeConf
         _logger = logger;
         _options = options.CurrentValue;
         _observableOptions = _options;
+        _snapshotProvider = runtimeConfigurationPublisher;
         _dataSourceFactory = dataSourceFactory;
         _ownedRuntimeConfigurationPublisher = ownsRuntimeConfigurationPublisher ? runtimeConfigurationPublisher : null;
 
         _options.Connection.SetLogger(_logger);
-        _settings = PostgreSQLDataSourceSettings.FromOptions(_options);
+        _settings = PostgreSQLDataSourceSettings.FromSnapshot(_snapshotProvider.Current.Connection);
         _dataSource = new ActiveDataSource(_dataSourceFactory(_settings));
         LogDataSourceConfigured(_settings);
 
@@ -194,10 +186,19 @@ internal sealed class PostgreSQLDataSource : IPostgreSQLDataSource, IRuntimeConf
         return new NpgsqlDataSourceHandle(dataSourceBuilder.Build());
     }
 
-    public void OnRuntimeConfigurationChanged(GlacialCachePostgreSQLOptions options)
+    public void OnRuntimeConfigurationChanged(RuntimeConfigurationChangedEventArgs change)
     {
-        _options = options;
-        TryUpdateDataSource(_observableOptions);
+        if (change.Options != null)
+        {
+            _options = change.Options;
+        }
+
+        if (!change.Changes.ConnectionStringChanged && !change.Changes.ConnectionPoolChanged)
+        {
+            return;
+        }
+
+        TryUpdateDataSource(change.Current.Connection);
         _logger.LogDebug("Runtime configuration changes synchronized to PostgreSQL data source");
     }
 
@@ -268,7 +269,7 @@ internal sealed class PostgreSQLDataSource : IPostgreSQLDataSource, IRuntimeConf
             var maskedNewValue = MaskConnectionString(typedArgs.NewValue, _options.Security.ConnectionString);
 
             _logger.LogDebug("Connection string changed from {OldValue} to {NewValue}", maskedOldValue, maskedNewValue);
-            TryUpdateDataSource(_observableOptions);
+            TryUpdateDataSourceFromObservableOptions();
         }
     }
 
@@ -280,15 +281,28 @@ internal sealed class PostgreSQLDataSource : IPostgreSQLDataSource, IRuntimeConf
         }
 
         _logger.LogDebug("Connection pool property changed: {PropertyName}", e.PropertyName);
-        TryUpdateDataSource(_observableOptions);
+        TryUpdateDataSourceFromObservableOptions();
     }
 
-    private bool TryUpdateDataSource(GlacialCachePostgreSQLOptions options)
+    private bool TryUpdateDataSourceFromObservableOptions()
+    {
+        try
+        {
+            return TryUpdateDataSource(RuntimeConfigurationSnapshot.FromObservableOptions(_observableOptions).Connection);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create PostgreSQL data source settings from configuration");
+            return false;
+        }
+    }
+
+    private bool TryUpdateDataSource(ConnectionRuntimeSnapshot snapshot)
     {
         PostgreSQLDataSourceSettings candidateSettings;
         try
         {
-            candidateSettings = PostgreSQLDataSourceSettings.FromOptions(options);
+            candidateSettings = PostgreSQLDataSourceSettings.FromSnapshot(snapshot);
         }
         catch (Exception ex)
         {

@@ -13,22 +13,24 @@ internal sealed class DbNomenclature : IDbNomenclature, IRuntimeConfigurationSub
     private readonly GlacialCachePostgreSQLOptions _observableOptions;
     private readonly IDisposable _runtimeConfigurationSubscription;
     private readonly IRuntimeConfigurationPublisher? _ownedRuntimeConfigurationPublisher;
+    private readonly IRuntimeConfigurationSnapshotProvider _snapshotProvider;
     private GlacialCachePostgreSQLOptions _options;
+    private RuntimeConfigurationSnapshot _snapshot;
 
     /// <summary>
     /// The table name (lowercase, validated PostgreSQL identifier).
     /// </summary>
-    public string TableName { get; private set; } = string.Empty;
+    public string TableName => Volatile.Read(ref _snapshot).Cache.TableName;
 
     /// <summary>
     /// The fully qualified table name (schema.table).
     /// </summary>
-    public string FullTableName { get; private set; } = string.Empty;
+    public string FullTableName => Volatile.Read(ref _snapshot).Cache.FullTableName;
 
     /// <summary>
     /// The schema name (lowercase, validated PostgreSQL identifier).
     /// </summary>
-    public string SchemaName { get; private set; } = string.Empty;
+    public string SchemaName => Volatile.Read(ref _snapshot).Cache.SchemaName;
 
     internal DbNomenclature(IOptionsMonitor<GlacialCachePostgreSQLOptions> options, ILogger<DbNomenclature> logger)
         : this(
@@ -59,10 +61,10 @@ internal sealed class DbNomenclature : IDbNomenclature, IRuntimeConfigurationSub
         _options = options.CurrentValue;
         _observableOptions = _options;
         _logger = logger;
+        _snapshotProvider = runtimeConfigurationPublisher;
         _ownedRuntimeConfigurationPublisher = ownsRuntimeConfigurationPublisher ? runtimeConfigurationPublisher : null;
 
-        // Initialize from current values
-        InitializeFromOptions(_options);
+        _snapshot = _snapshotProvider.Current;
 
         // Register for observable property changes to keep internal state synchronized
         _options.Cache.TableNameObservable.PropertyChanged += OnTableNameChanged;
@@ -71,10 +73,19 @@ internal sealed class DbNomenclature : IDbNomenclature, IRuntimeConfigurationSub
         _runtimeConfigurationSubscription = runtimeConfigurationPublisher.Subscribe(this);
     }
 
-    public void OnRuntimeConfigurationChanged(GlacialCachePostgreSQLOptions options)
+    public void OnRuntimeConfigurationChanged(RuntimeConfigurationChangedEventArgs change)
     {
-        _options = options;
-        UpdateFromObservableProperties();
+        if (change.Options != null)
+        {
+            _options = change.Options;
+        }
+
+        if (!change.Changes.CacheNomenclatureChanged)
+        {
+            return;
+        }
+
+        Volatile.Write(ref _snapshot, change.Current);
         _logger.LogDebug("Runtime configuration changes synchronized to nomenclature");
     }
 
@@ -110,24 +121,7 @@ internal sealed class DbNomenclature : IDbNomenclature, IRuntimeConfigurationSub
 
     private void UpdateFromObservableProperties()
     {
-        // CacheOptions already validates and lowercases the values
-        TableName = _observableOptions.Cache.TableNameObservable.Value;
-        SchemaName = _observableOptions.Cache.SchemaNameObservable.Value;
-        FullTableName = $"{SchemaName}.{TableName}";
-    }
-
-    private void InitializeFromOptions(GlacialCachePostgreSQLOptions options)
-    {
-        // Initial setup without notifications
-        UpdateProperties(options);
-    }
-
-    private void UpdateProperties(GlacialCachePostgreSQLOptions options)
-    {
-        // CacheOptions already validates and lowercases the values
-        TableName = options.Cache.TableName;
-        SchemaName = options.Cache.SchemaName;
-        FullTableName = $"{SchemaName}.{TableName}";
+        Volatile.Write(ref _snapshot, RuntimeConfigurationSnapshot.FromObservableOptions(_observableOptions));
     }
 
     public void Dispose()

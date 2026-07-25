@@ -43,6 +43,8 @@ public static class ServiceCollectionExtensions
             var logger = sp.GetRequiredService<ILogger<RuntimeConfigurationPublisher>>();
             return new RuntimeConfigurationPublisher(options, synchronizer, logger);
         });
+        services.TryAddSingleton<IRuntimeConfigurationSnapshotProvider>(sp =>
+            sp.GetRequiredService<IRuntimeConfigurationPublisher>());
 
         // Register domain services that depend on configuration
         services.TryAddSingleton<IDbNomenclature>(sp =>

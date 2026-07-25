@@ -284,6 +284,26 @@ var combinedOptions = new DistributedCacheEntryOptions
 };
 ```
 
+### Allocation-sensitive batch writes
+
+The regular `SetMultipleAsync` overload for `ReadOnlyMemory<byte>` snapshots payloads and is the recommended default. When payload-copy allocations are a measured bottleneck, `SetMultipleDirectAsync` provides an explicit opt-in path:
+
+```csharp
+using var owner = MemoryPool<byte>.Shared.Rent(payloadLength);
+FillPayload(owner.Memory.Span[..payloadLength]);
+
+var entries = new Dictionary<string, (ReadOnlyMemory<byte>, DistributedCacheEntryOptions)>
+{
+    ["catalog:payload"] = (owner.Memory[..payloadLength], new DistributedCacheEntryOptions())
+};
+
+await cache.SetMultipleDirectAsync(entries, cancellationToken);
+```
+
+Keep every backing buffer alive, immutable, and undisposed until the awaited call completes, including cancellation and failure. Never return pooled memory or reuse its storage while the operation is still running. This API avoids explicit application payload copies but does not imply end-to-end zero-copy behavior inside Npgsql or PostgreSQL.
+
+Use the regular snapshot overload when buffer ownership is uncertain; use the direct overload only after allocation measurements justify its stricter lifetime contract.
+
 ### Typed Cache Operations
 
 GlacialCache provides strongly-typed operations for type safety and automatic serialization:

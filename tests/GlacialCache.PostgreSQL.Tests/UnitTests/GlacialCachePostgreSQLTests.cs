@@ -66,4 +66,29 @@ public class GlacialCachePostgreSQLTests
         command.Parameters[2].Value.ShouldBe(DBNull.Value);
         command.Parameters[5].Value.ShouldBe(now);
     }
+
+    [Fact]
+    public void CreateSetMultipleDirectBatchCommand_RetainsSliceAndUsesBytea()
+    {
+        // Arrange
+        var backingBuffer = new byte[] { 0, 1, 2, 3, 0 };
+        ReadOnlyMemory<byte> value = backingBuffer.AsMemory(1, 3);
+
+        // Act
+        var command = GlacialCachePostgreSQL.CreateSetMultipleDirectBatchCommand(
+            "INSERT INTO test VALUES ($1, $2, $6 + $3::interval, $4, $5)",
+            "key",
+            value,
+            null,
+            null,
+            null,
+            DateTimeOffset.UtcNow);
+
+        // Assert
+        command.Parameters[1].NpgsqlDbType.ShouldBe(NpgsqlDbType.Bytea);
+        command.Parameters[1].Value.ShouldBeOfType<ReadOnlyMemory<byte>>().Span.SequenceEqual(value.Span).ShouldBeTrue();
+
+        backingBuffer[2] = 9;
+        command.Parameters[1].Value.ShouldBeOfType<ReadOnlyMemory<byte>>().Span[1].ShouldBe((byte)9);
+    }
 }

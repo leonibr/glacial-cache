@@ -223,11 +223,51 @@ public class GlacialCachePostgreSQL : IGlacialCache, IRuntimeConfigurationSubscr
         TimeSpan? slidingExpiration,
         string? valueType,
         DateTimeOffset now)
+        => CreateSetMultipleBatchCommandCore(
+            setMultipleSql,
+            key,
+            value,
+            null,
+            relativeInterval,
+            slidingExpiration,
+            valueType,
+            now);
+
+    internal static NpgsqlBatchCommand CreateSetMultipleDirectBatchCommand(
+        string setMultipleSql,
+        string key,
+        ReadOnlyMemory<byte> value,
+        TimeSpan? relativeInterval,
+        TimeSpan? slidingExpiration,
+        string? valueType,
+        DateTimeOffset now)
+        => CreateSetMultipleBatchCommandCore(
+            setMultipleSql,
+            key,
+            value,
+            NpgsqlTypes.NpgsqlDbType.Bytea,
+            relativeInterval,
+            slidingExpiration,
+            valueType,
+            now);
+
+    private static NpgsqlBatchCommand CreateSetMultipleBatchCommandCore(
+        string setMultipleSql,
+        string key,
+        object value,
+        NpgsqlTypes.NpgsqlDbType? valueDbType,
+        TimeSpan? relativeInterval,
+        TimeSpan? slidingExpiration,
+        string? valueType,
+        DateTimeOffset now)
     {
         var batchCommand = new NpgsqlBatchCommand(setMultipleSql);
 
         batchCommand.Parameters.Add(new() { Value = key });
-        batchCommand.Parameters.Add(new() { Value = value });
+        if (valueDbType.HasValue)
+            batchCommand.Parameters.Add(new() { Value = value, NpgsqlDbType = valueDbType.Value });
+        else
+            batchCommand.Parameters.Add(new() { Value = value });
 
         if (relativeInterval.HasValue)
             batchCommand.Parameters.Add(new() { Value = relativeInterval.Value });
@@ -908,7 +948,7 @@ public class GlacialCachePostgreSQL : IGlacialCache, IRuntimeConfigurationSubscr
 
     /// <summary>
     /// Sets multiple cache entries in a single database operation using PostgreSQL's batch functionality.
-    /// Overload that accepts ReadOnlyMemory<byte> values to reduce allocations.
+    /// Overload that snapshots ReadOnlyMemory<byte> values before PostgreSQL executes the batch.
     /// </summary>
     public async Task SetMultipleAsync(Dictionary<string, (ReadOnlyMemory<byte> value, DistributedCacheEntryOptions options)> entries, CancellationToken token = default)
     {
@@ -972,6 +1012,82 @@ public class GlacialCachePostgreSQL : IGlacialCache, IRuntimeConfigurationSubscr
                     _dbRawCommands.SetMultipleSql,
                     entry.Key,
                     entry.Value.value.ToArray(),
+                    relativeInterval,
+                    slidingExpiration,
+                    null,
+                    now);
+
+                batch.BatchCommands.Add(batchCommand);
+            }
+
+            await batch.ExecuteNonQueryAsync(token);
+
+            _logger.LogBatchSetSuccess(entries.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogBatchSetError(entries.Count, ex);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Sets multiple cache entries without copying their payload buffers before PostgreSQL executes the batch.
+    /// </summary>
+    /// <remarks>
+    /// Callers must keep every backing buffer alive, immutable, and undisposed until the returned task completes,
+    /// including when the operation is canceled or fails. Use the ReadOnlyMemory overload of
+    /// <c>SetMultipleAsync</c> when snapshot isolation is preferred.
+    /// </remarks>
+    public async Task SetMultipleDirectAsync(Dictionary<string, (ReadOnlyMemory<byte> value, DistributedCacheEntryOptions options)> entries, CancellationToken token = default)
+    {
+        ThrowIfDisposed();
+
+        if (entries == null || entries.Count == 0)
+            return;
+
+        // Validate the complete input before a chunk can be written.
+        ValidateKeys(entries.Keys);
+
+        const int maxBatchSize = 1000;
+        if (entries.Count > maxBatchSize)
+        {
+            await ProcessLargeDirectBatchAsync(entries, token);
+            return;
+        }
+
+        try
+        {
+            await using var connection = await _dataSource.GetConnectionAsync(token);
+            await using var batch = new NpgsqlBatch(connection);
+
+            foreach (var entry in entries)
+            {
+                TimeSpan? relativeInterval = null;
+                var now = _timeProvider.GetUtcNow();
+
+                if (entry.Value.options.AbsoluteExpiration.HasValue)
+                {
+                    relativeInterval = _timeConverter.ConvertToRelativeInterval(entry.Value.options.AbsoluteExpiration.Value, now);
+                }
+                else if (entry.Value.options.AbsoluteExpirationRelativeToNow.HasValue)
+                {
+                    relativeInterval = entry.Value.options.AbsoluteExpirationRelativeToNow.Value;
+                    if (relativeInterval <= TimeSpan.Zero)
+                    {
+                        relativeInterval = TimeSpan.FromMilliseconds(1);
+                    }
+                }
+                else if (_options.Cache.DefaultAbsoluteExpirationRelativeToNow.HasValue)
+                {
+                    relativeInterval = _options.Cache.DefaultAbsoluteExpirationRelativeToNow.Value;
+                }
+
+                var slidingExpiration = entry.Value.options.SlidingExpiration ?? _options.Cache.DefaultSlidingExpiration;
+                var batchCommand = CreateSetMultipleDirectBatchCommand(
+                    _dbRawCommands.SetMultipleSql,
+                    entry.Key,
+                    entry.Value.value,
                     relativeInterval,
                     slidingExpiration,
                     null,
@@ -1083,6 +1199,30 @@ public class GlacialCachePostgreSQL : IGlacialCache, IRuntimeConfigurationSubscr
             }
 
             await SetMultipleAsync(chunk, token);
+        }
+
+        _logger.LogLargeBatchProcessing(entries.Count);
+    }
+
+    /// <summary>
+    /// Processes large direct-memory batches without copying payload buffers.
+    /// </summary>
+    private async Task ProcessLargeDirectBatchAsync(Dictionary<string, (ReadOnlyMemory<byte> value, DistributedCacheEntryOptions options)> entries, CancellationToken token)
+    {
+        const int chunkSize = 500;
+        var entriesArray = entries.ToArray();
+
+        for (int i = 0; i < entriesArray.Length; i += chunkSize)
+        {
+            var endIndex = Math.Min(i + chunkSize, entriesArray.Length);
+            var chunk = new Dictionary<string, (ReadOnlyMemory<byte> value, DistributedCacheEntryOptions options)>(endIndex - i);
+
+            for (int j = i; j < endIndex; j++)
+            {
+                chunk[entriesArray[j].Key] = entriesArray[j].Value;
+            }
+
+            await SetMultipleDirectAsync(chunk, token);
         }
 
         _logger.LogLargeBatchProcessing(entries.Count);

@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Linq;
 using GlacialCache.PostgreSQL.Abstractions;
 using GlacialCache.PostgreSQL.Configuration;
@@ -584,6 +585,58 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task DirectMemoryBatch_ShouldRoundTripSupportedMemoryShapes()
+    {
+        var whole = new byte[] { 1, 2, 3 };
+        var sliceBacking = new byte[] { 99, 4, 5, 6, 99 };
+        using var manager = new TestMemoryManager(new byte[] { 7, 8, 9 });
+        var entries = new Dictionary<string, (ReadOnlyMemory<byte> value, DistributedCacheEntryOptions options)>
+        {
+            ["direct-whole"] = (whole, new DistributedCacheEntryOptions()),
+            ["direct-slice"] = (sliceBacking.AsMemory(1, 3), new DistributedCacheEntryOptions()),
+            ["direct-custom"] = (manager.Memory, new DistributedCacheEntryOptions())
+        };
+
+        await _glacialCache!.SetMultipleDirectAsync(entries);
+        var retrieved = await _glacialCache.GetMultipleAsync(entries.Keys);
+
+        retrieved["direct-whole"].ShouldBeEquivalentTo(new byte[] { 1, 2, 3 });
+        retrieved["direct-slice"].ShouldBeEquivalentTo(new byte[] { 4, 5, 6 });
+        retrieved["direct-custom"].ShouldBeEquivalentTo(new byte[] { 7, 8, 9 });
+    }
+
+    [Fact]
+    public async Task DirectMemoryBatch_ShouldValidateAllKeysBeforeChunking()
+    {
+        var entries = Enumerable.Range(0, 1000).ToDictionary(
+            index => $"direct-validation-{index}",
+            index => ((ReadOnlyMemory<byte>)new byte[] { (byte)(index % 251) }, new DistributedCacheEntryOptions()));
+        entries["invalid\nkey"] = (new byte[] { 1 }, new DistributedCacheEntryOptions());
+
+        await Should.ThrowAsync<ArgumentException>(() => _glacialCache!.SetMultipleDirectAsync(entries));
+
+        var retrieved = await _glacialCache!.GetAsync("direct-validation-0");
+        retrieved.ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData(1000)]
+    [InlineData(1001)]
+    public async Task DirectMemoryBatch_ShouldRoundTripBatchBoundaries(int count)
+    {
+        var entries = Enumerable.Range(0, count).ToDictionary(
+            index => $"direct-boundary-{count}-{index}",
+            index => ((ReadOnlyMemory<byte>)BitConverter.GetBytes(index), new DistributedCacheEntryOptions()));
+
+        await _glacialCache!.SetMultipleDirectAsync(entries);
+        var keys = new[] { $"direct-boundary-{count}-0", $"direct-boundary-{count}-{count - 1}" };
+        var retrieved = await _glacialCache.GetMultipleAsync(keys);
+
+        retrieved[keys[0]].ShouldBeEquivalentTo(BitConverter.GetBytes(0));
+        retrieved[keys[1]].ShouldBeEquivalentTo(BitConverter.GetBytes(count - 1));
+    }
+
+    [Fact]
     public async Task Comprehensive_VeryLargePayload_ShouldHandleCorrectly()
     {
         // Test with very large payload (10MB)
@@ -601,6 +654,21 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
     }
 
     private static CacheEntry<T> CreateTypedEntry<T>(string key, T value) => CacheEntryTestHelper.Create(key, value);
+
+    private sealed class TestMemoryManager(byte[] buffer) : MemoryManager<byte>
+    {
+        public override Span<byte> GetSpan() => buffer;
+
+        public override MemoryHandle Pin(int elementIndex = 0) => throw new NotSupportedException();
+
+        public override void Unpin()
+        {
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+        }
+    }
 
     private static object CreateTypedEntry(string key, object value)
     {

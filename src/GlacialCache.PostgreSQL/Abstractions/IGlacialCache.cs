@@ -23,12 +23,27 @@ public interface IGlacialCache : IDistributedCache
 
     /// <summary>
     /// Sets multiple cache entries in a single database operation using PostgreSQL's batch functionality.
-    /// Overload that accepts ReadOnlyMemory<byte> values.
+    /// Overload that snapshots ReadOnlyMemory<byte> values before PostgreSQL executes the batch.
     /// </summary>
     /// <param name="entries">A dictionary of key-value pairs with their expiration options.</param>
     /// <param name="token">Cancellation token.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     Task SetMultipleAsync(
+        Dictionary<string, (ReadOnlyMemory<byte> value, DistributedCacheEntryOptions options)> entries,
+        CancellationToken token = default);
+
+    /// <summary>
+    /// Sets multiple cache entries without copying their payload buffers before PostgreSQL executes the batch.
+    /// </summary>
+    /// <remarks>
+    /// Callers must keep every backing buffer alive, immutable, and undisposed until the returned task completes,
+    /// including when the operation is canceled or fails. Prefer the ReadOnlyMemory overload of
+    /// <c>SetMultipleAsync</c> when snapshot isolation is more important than avoiding payload copies.
+    /// </remarks>
+    /// <param name="entries">A dictionary of key-value pairs with their expiration options.</param>
+    /// <param name="token">Cancellation token.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    Task SetMultipleDirectAsync(
         Dictionary<string, (ReadOnlyMemory<byte> value, DistributedCacheEntryOptions options)> entries,
         CancellationToken token = default);
 

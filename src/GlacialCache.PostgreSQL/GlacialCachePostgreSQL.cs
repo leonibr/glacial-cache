@@ -252,6 +252,46 @@ public class GlacialCachePostgreSQL : IGlacialCache, IRuntimeConfigurationSubscr
             valueType,
             now);
 
+    internal static NpgsqlBatchCommand CreateSetMultipleSnapshotBatchCommand(
+        string setMultipleSql,
+        string key,
+        ReadOnlyMemory<byte> value,
+        TimeSpan? relativeInterval,
+        TimeSpan? slidingExpiration,
+        string? valueType,
+        DateTimeOffset now)
+    {
+        var batchCommand = new NpgsqlBatchCommand(setMultipleSql);
+
+        batchCommand.Parameters.Add(new() { Value = key });
+        batchCommand.Parameters.Add(new NpgsqlParameter<ReadOnlyMemory<byte>>
+        {
+            TypedValue = value,
+            NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bytea,
+        });
+        batchCommand.Parameters.Add(relativeInterval.HasValue
+            ? new NpgsqlParameter<TimeSpan> { TypedValue = relativeInterval.Value }
+            : new NpgsqlParameter { Value = DBNull.Value, NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Interval });
+        batchCommand.Parameters.Add(slidingExpiration.HasValue
+            ? new NpgsqlParameter<TimeSpan> { TypedValue = slidingExpiration.Value }
+            : new NpgsqlParameter { Value = DBNull.Value, NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Interval });
+        batchCommand.Parameters.Add(new() { Value = valueType ?? (object)DBNull.Value });
+        batchCommand.Parameters.Add(new NpgsqlParameter<DateTimeOffset> { TypedValue = now });
+
+        return batchCommand;
+    }
+
+    internal static ReadOnlyMemory<byte> CopyToSnapshotArena(
+        ReadOnlyMemory<byte> value,
+        byte[] payloadArena,
+        ref int payloadOffset)
+    {
+        value.Span.CopyTo(payloadArena.AsSpan(payloadOffset, value.Length));
+        var snapshot = new ReadOnlyMemory<byte>(payloadArena, payloadOffset, value.Length);
+        payloadOffset = checked(payloadOffset + value.Length);
+        return snapshot;
+    }
+
     private static NpgsqlBatchCommand CreateSetMultipleBatchCommandCore(
         string setMultipleSql,
         string key,
@@ -1120,8 +1160,19 @@ public class GlacialCachePostgreSQL : IGlacialCache, IRuntimeConfigurationSubscr
 
             await using var batch = new NpgsqlBatch(connection);
 
+            var payloadLength = 0;
             foreach (var entry in entries)
             {
+                payloadLength = checked(payloadLength + entry.Value.value.Length);
+            }
+
+            var payloadArena = new byte[payloadLength];
+            var payloadOffset = 0;
+
+            foreach (var entry in entries)
+            {
+                var payload = CopyToSnapshotArena(entry.Value.value, payloadArena, ref payloadOffset);
+
                 // Phase 2: Convert absolute expiration to relative interval using TimeConverterService
                 TimeSpan? relativeInterval = null;
                 var now = _timeProvider.GetUtcNow();
@@ -1146,10 +1197,10 @@ public class GlacialCachePostgreSQL : IGlacialCache, IRuntimeConfigurationSubscr
                 }
 
                 var slidingExpiration = entry.Value.options.SlidingExpiration ?? _options.Cache.DefaultSlidingExpiration;
-                var batchCommand = CreateSetMultipleBatchCommand(
+                var batchCommand = CreateSetMultipleSnapshotBatchCommand(
                     _dbRawCommands.SetMultipleSql,
                     entry.Key,
-                    entry.Value.value.ToArray(),
+                    payload,
                     relativeInterval,
                     slidingExpiration,
                     null,

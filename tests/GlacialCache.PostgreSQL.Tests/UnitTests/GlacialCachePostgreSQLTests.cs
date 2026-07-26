@@ -11,6 +11,8 @@ using Moq;
 using Npgsql;
 using NpgsqlTypes;
 using Polly;
+using System.Buffers;
+using System.Runtime.InteropServices;
 
 namespace GlacialCache.PostgreSQL.Tests.UnitTests;
 
@@ -90,5 +92,83 @@ public class GlacialCachePostgreSQLTests
 
         backingBuffer[2] = 9;
         command.Parameters[1].Value.ShouldBeOfType<ReadOnlyMemory<byte>>().Span[1].ShouldBe((byte)9);
+    }
+
+    [Fact]
+    public void CopyToSnapshotArena_PreservesSlicesOrderingAndConstructionSnapshot()
+    {
+        var firstBacking = new byte[] { 0, 1, 2, 3, 0 };
+        using var owner = new NonArrayMemoryManager(new byte[] { 4, 5, 6 });
+        var arena = new byte[6];
+        var offset = 0;
+        MemoryMarshal.TryGetArray((ReadOnlyMemory<byte>)owner.Memory, out ArraySegment<byte> _).ShouldBeFalse();
+
+        var first = GlacialCachePostgreSQL.CopyToSnapshotArena(firstBacking.AsMemory(1, 3), arena, ref offset);
+        var second = GlacialCachePostgreSQL.CopyToSnapshotArena(owner.Memory[..3], arena, ref offset);
+        var firstCommand = GlacialCachePostgreSQL.CreateSetMultipleSnapshotBatchCommand(
+            "INSERT INTO test VALUES ($1, $2, $6 + $3::interval, $4, $5)",
+            "first",
+            first,
+            null,
+            null,
+            null,
+            DateTimeOffset.UtcNow);
+        var secondCommand = GlacialCachePostgreSQL.CreateSetMultipleSnapshotBatchCommand(
+            "INSERT INTO test VALUES ($1, $2, $6 + $3::interval, $4, $5)",
+            "second",
+            second,
+            null,
+            null,
+            null,
+            DateTimeOffset.UtcNow);
+
+        firstBacking[2] = 9;
+        owner.Memory.Span[1] = 9;
+
+        firstCommand.Parameters[0].Value.ShouldBe("first");
+        firstCommand.Parameters[1].Value.ShouldBeOfType<ReadOnlyMemory<byte>>().ToArray().ShouldBe(new byte[] { 1, 2, 3 });
+        secondCommand.Parameters[0].Value.ShouldBe("second");
+        secondCommand.Parameters[1].Value.ShouldBeOfType<ReadOnlyMemory<byte>>().ToArray().ShouldBe(new byte[] { 4, 5, 6 });
+        offset.ShouldBe(6);
+        MemoryMarshal.TryGetArray(first, out var firstSegment).ShouldBeTrue();
+        MemoryMarshal.TryGetArray(second, out var secondSegment).ShouldBeTrue();
+        ReferenceEquals(firstSegment.Array, secondSegment.Array).ShouldBeTrue();
+        firstSegment.Offset.ShouldBe(0);
+        secondSegment.Offset.ShouldBe(3);
+    }
+
+    [Fact]
+    public void CreateSetMultipleSnapshotBatchCommand_UsesTypedValueParameters()
+    {
+        var now = new DateTimeOffset(2025, 1, 1, 12, 0, 0, TimeSpan.Zero);
+
+        var command = GlacialCachePostgreSQL.CreateSetMultipleSnapshotBatchCommand(
+            "INSERT INTO test VALUES ($1, $2, $6 + $3::interval, $4, $5)",
+            "key",
+            new byte[] { 1, 2, 3 },
+            TimeSpan.FromMinutes(1),
+            TimeSpan.FromMinutes(2),
+            null,
+            now);
+
+        command.Parameters[1].ShouldBeOfType<NpgsqlParameter<ReadOnlyMemory<byte>>>();
+        command.Parameters[2].ShouldBeOfType<NpgsqlParameter<TimeSpan>>();
+        command.Parameters[3].ShouldBeOfType<NpgsqlParameter<TimeSpan>>();
+        command.Parameters[5].ShouldBeOfType<NpgsqlParameter<DateTimeOffset>>();
+    }
+
+    private sealed class NonArrayMemoryManager(byte[] buffer) : MemoryManager<byte>
+    {
+        public override Span<byte> GetSpan() => buffer;
+
+        public override MemoryHandle Pin(int elementIndex = 0) => throw new NotSupportedException();
+
+        public override void Unpin()
+        {
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+        }
     }
 }

@@ -26,6 +26,9 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
     private ServiceProvider? _serviceProvider;
     private IGlacialCache? _glacialCache;
     private IDistributedCache? _distributedCache;
+#if NET9_0_OR_GREATER
+    private IBufferDistributedCache? _bufferDistributedCache;
+#endif
     private NpgsqlDataSource? _dataSource;
 
     public ComprehensiveValidationTests(ITestOutputHelper output) : base(output)
@@ -64,6 +67,9 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
             _serviceProvider = services.BuildServiceProvider();
             _glacialCache = _serviceProvider.GetRequiredService<IGlacialCache>();
             _distributedCache = _serviceProvider.GetRequiredService<IDistributedCache>();
+#if NET9_0_OR_GREATER
+            _bufferDistributedCache = _serviceProvider.GetRequiredService<IBufferDistributedCache>();
+#endif
 
             // Create data source for proper disposal
             _dataSource = NpgsqlDataSource.Create(_postgres.GetConnectionString());
@@ -104,6 +110,30 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
             // Don't rethrow to avoid masking test failures
         }
     }
+
+#if NET9_0_OR_GREATER
+    [Fact]
+    public async Task BufferDistributedCache_ShouldSetAndGetWithoutArrayBasedApi()
+    {
+        var bytes = Enumerable.Range(0, 100_000).Select(i => (byte)i).ToArray();
+        var value = new ReadOnlySequence<byte>(bytes);
+        var destination = new ArrayBufferWriter<byte>();
+
+        await _bufferDistributedCache!.SetAsync(
+            "buffer-cache-key",
+            value,
+            new DistributedCacheEntryOptions());
+
+        var found = await _bufferDistributedCache.TryGetAsync("buffer-cache-key", destination);
+        var missing = await _bufferDistributedCache.TryGetAsync(
+            "missing-buffer-cache-key",
+            new ArrayBufferWriter<byte>());
+
+        found.ShouldBeTrue();
+        destination.WrittenSpan.SequenceEqual(value.FirstSpan).ShouldBeTrue();
+        missing.ShouldBeFalse();
+    }
+#endif
 
     [Fact]
     public async Task Comprehensive_AllDataTypes_ShouldSerializeAndDeserializeCorrectly()

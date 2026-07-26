@@ -277,15 +277,15 @@ value BYTEA NOT NULL,
 absolute_expiration TIMESTAMPTZ,
 sliding_interval INTERVAL,
 next_expiration TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-value_type VARCHAR(255),
+value_type TEXT,
 value_size INTEGER GENERATED ALWAYS AS (OCTET_LENGTH(value)) STORED
 );
 
--- Performance indexes
-CREATE INDEX IF NOT EXISTS idx_{_nomeclature.TableName}_val_type
-ON {_nomeclature.FullTableName} (value_type)
-WHERE value_type IS NOT NULL;
+-- Migrate installations created before provider-neutral typed entries allowed long generic names.
+DROP INDEX IF EXISTS {_nomeclature.SchemaName}.idx_{_nomeclature.TableName}_val_type;
+ALTER TABLE {_nomeclature.FullTableName} ALTER COLUMN value_type TYPE TEXT;
 
+-- Performance indexes
 CREATE INDEX IF NOT EXISTS idx_{_nomeclature.TableName}_val_size
 ON {_nomeclature.FullTableName} (value_size);
 
@@ -315,15 +315,15 @@ value BYTEA NOT NULL,
 absolute_expiration TIMESTAMPTZ,
 sliding_interval INTERVAL,
 next_expiration TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-value_type VARCHAR(255),
+value_type TEXT,
 value_size INTEGER GENERATED ALWAYS AS (OCTET_LENGTH(value)) STORED
 );
 
--- Performance indexes
-CREATE INDEX IF NOT EXISTS idx_{_nomeclature.TableName}_val_type
-ON {_nomeclature.FullTableName} (value_type)
-WHERE value_type IS NOT NULL;
+-- Migrate installations created before provider-neutral typed entries allowed long generic names.
+DROP INDEX IF EXISTS {_nomeclature.SchemaName}.idx_{_nomeclature.TableName}_val_type;
+ALTER TABLE {_nomeclature.FullTableName} ALTER COLUMN value_type TYPE TEXT;
 
+-- Performance indexes
 CREATE INDEX IF NOT EXISTS idx_{_nomeclature.TableName}_val_size
 ON {_nomeclature.FullTableName} (value_size);
 

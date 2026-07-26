@@ -2,7 +2,7 @@ using GlacialCache.PostgreSQL;
 using Microsoft.Extensions.Caching.Distributed;
 using System.Text.Json;
 using GlacialCache.PostgreSQL.Extensions;
-using GlacialCache.PostgreSQL.Abstractions;
+using GlacialCache.Abstractions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -158,7 +158,6 @@ app.MapGet("/cache/stats", (IGlacialCache glacialCache) =>
 .WithName("GetCacheStats");
 
 app.Run();
-
 
 
 

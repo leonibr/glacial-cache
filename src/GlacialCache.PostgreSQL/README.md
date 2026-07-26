@@ -140,7 +140,7 @@ CREATE TABLE public.glacial_cache (
     absolute_expiration TIMESTAMPTZ,
     sliding_interval INTERVAL,
     next_expiration TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    value_type VARCHAR(255),
+    value_type TEXT,
     value_size INTEGER GENERATED ALWAYS AS (OCTET_LENGTH(value)) STORED
 );
 

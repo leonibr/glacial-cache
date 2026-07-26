@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 using Testcontainers.PostgreSql;
 using GlacialCache.PostgreSQL;
 using GlacialCache.PostgreSQL.Extensions;
-using GlacialCache.PostgreSQL.Abstractions;
+using GlacialCache.Abstractions;
 
 namespace GlacialCache.Benchmarks;
 

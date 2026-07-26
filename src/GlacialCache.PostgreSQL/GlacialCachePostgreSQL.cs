@@ -1,4 +1,4 @@
-using MemoryPack;
+using GlacialCache.Abstractions;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -21,7 +21,7 @@ using Services;
 /// <summary>
 /// Enhanced PostgreSQL implementation of IDistributedCache with connection optimization.
 /// </summary>
-public class GlacialCachePostgreSQL : IGlacialCache, IRuntimeConfigurationSubscriber, IDisposable
+public class GlacialCachePostgreSQL : global::GlacialCache.Abstractions.IGlacialCache, GlacialCache.PostgreSQL.Abstractions.IGlacialCache, IRuntimeConfigurationSubscriber, IDisposable
 {
     private readonly IDisposable _runtimeConfigurationSubscription;
     private readonly IRuntimeConfigurationPublisher? _ownedRuntimeConfigurationPublisher;
@@ -556,9 +556,7 @@ public class GlacialCachePostgreSQL : IGlacialCache, IRuntimeConfigurationSubscr
     private async Task SetEntryAsyncCore<T>(CacheEntry<T> entry, CancellationToken token = default)
     {
         // If SerializedData is empty, we need to serialize the Value first
-        var entryToStore = entry.SerializedData.IsEmpty
-            ? _entryHelper.Create(entry.Key, entry.Value, entry.AbsoluteExpiration, entry.SlidingExpiration)
-            : entry;
+        var entryToStore = _entryHelper.PrepareForStorage(entry);
 
         // Create a byte[] entry from the serialized value
         var byteEntry = _entryHelper.FromSerializedData<byte[]>(
@@ -1691,64 +1689,27 @@ public class GlacialCachePostgreSQL : IGlacialCache, IRuntimeConfigurationSubscr
         var entry = await GetEntryAsyncCore(key, token);
         if (entry == null) return null;
 
-        try
+        if (_entryHelper.TryFromSerializedData<T>(entry, out var result, out var error))
+            return result;
+
+        // Backward compatibility for pre-type-metadata string entries.
+        if (typeof(T) == typeof(string) && string.IsNullOrWhiteSpace(entry.BaseType))
         {
-            // If a BaseType is recorded and it doesn't match the requested T, short-circuit to null
-            if (!string.IsNullOrWhiteSpace(entry.BaseType) && !string.Equals(entry.BaseType, typeof(T).FullName, StringComparison.Ordinal))
+            try
             {
-                return null;
+                var encoding = new System.Text.UTF8Encoding(false, true);
+                var value = encoding.GetString(entry.SerializedData.Span);
+                return (CacheEntry<T>)(object)_entryHelper.Create(key, value, entry.AbsoluteExpiration, entry.SlidingExpiration);
             }
-
-            // Cache the array to avoid duplicate ToArray() calls
-            var serializedBytes = entry.SerializedData.ToArray();
-
-            // Try to deserialize as the requested type via configured serializer
-            var value = _entryHelper.Deserialize<T>(serializedBytes);
-            if (value == null)
+            catch (Exception exception)
             {
-                _logger.LogDeserializationError(key, typeof(T).Name, null);
-                return null;
+                error ??= exception;
             }
-
-            return _entryHelper.FromSerializedData<T>(
-                key,
-                serializedBytes,
-                entry.AbsoluteExpiration,
-                entry.SlidingExpiration,
-                entry.BaseType);
         }
-        catch (Exception ex)
-        {
-            // Type-safety: if BaseType is stored and does not match requested type, return null
-            if (!string.IsNullOrWhiteSpace(entry.BaseType) && !string.Equals(entry.BaseType, typeof(T).FullName, StringComparison.Ordinal))
-            {
-                return null;
-            }
 
-            // Backward compatibility fallback: only if no BaseType stored and T is string
-            if (typeof(T) == typeof(string) && string.IsNullOrWhiteSpace(entry.BaseType))
-            {
-                try
-                {
-                    // Strict UTF-8 decoding (fail on invalid bytes)
-                    var enc = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
-                    var str = enc.GetString(entry.SerializedData.Span);
-                    var compat = _entryHelper.Create<string>(
-                        key,
-                        str,
-                        entry.AbsoluteExpiration,
-                        entry.SlidingExpiration);
-                    return (CacheEntry<T>)(object)compat;
-                }
-                catch
-                {
-                    // ignore and fall through
-                }
-            }
-
-            _logger.LogDeserializationError(key, typeof(T).Name, ex);
-            return null;
-        }
+        if (error is not null)
+            _logger.LogDeserializationError(key, typeof(T).Name, error);
+        return null;
     }
 
     private async Task<Dictionary<string, CacheEntry<T>?>> GetMultipleTypedEntriesAsync<T>(IEnumerable<string> keys, CancellationToken token)
@@ -1764,31 +1725,14 @@ public class GlacialCachePostgreSQL : IGlacialCache, IRuntimeConfigurationSubscr
                 continue;
             }
 
-            try
+            if (_entryHelper.TryFromSerializedData<T>(kvp.Value, out var typedEntry, out var error))
             {
-                // Cache the array to avoid duplicate ToArray() calls
-                var serializedBytes = kvp.Value.SerializedData.ToArray();
-
-#pragma warning disable CS8714 
-                var value = _entryHelper.Deserialize<T>(serializedBytes);
-#pragma warning restore CS8714 
-                if (value == null)
-                {
-                    _logger.LogDeserializationError(kvp.Key, typeof(T).Name, null);
-                    result[kvp.Key] = null;
-                    continue;
-                }
-
-                result[kvp.Key] = _entryHelper.FromSerializedData<T>(
-                    kvp.Key,
-                    serializedBytes,
-                    kvp.Value.AbsoluteExpiration,
-                    kvp.Value.SlidingExpiration,
-                    kvp.Value.BaseType);
+                result[kvp.Key] = typedEntry;
             }
-            catch (Exception ex)
+            else
             {
-                _logger.LogDeserializationError(kvp.Key, typeof(T).Name, ex);
+                if (error is not null)
+                    _logger.LogDeserializationError(kvp.Key, typeof(T).Name, error);
                 result[kvp.Key] = null;
             }
         }
@@ -1892,9 +1836,7 @@ public class GlacialCachePostgreSQL : IGlacialCache, IRuntimeConfigurationSubscr
             SetMultipleEntriesAsync(entriesArray.Select(e =>
             {
                 // If SerializedData is empty, we need to serialize the Value first
-                var entryToStore = e.SerializedData.IsEmpty
-                    ? _entryHelper.Create(e.Key, e.Value, e.AbsoluteExpiration, e.SlidingExpiration)
-                    : e;
+                var entryToStore = _entryHelper.PrepareForStorage(e);
 
                 return _entryHelper.FromSerializedData<byte[]>(
                     entryToStore.Key, entryToStore.SerializedData.ToArray(),
@@ -1911,8 +1853,16 @@ public class GlacialCachePostgreSQL : IGlacialCache, IRuntimeConfigurationSubscr
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(entries);
 
+        var now = _timeProvider.GetUtcNow();
         await ExecuteWithResilienceAsync(
-            SetMultipleEntriesAsync(entries.Select(e => _entryHelper.Create<T>(e.Key, e.Value.value, e.Value.options?.AbsoluteExpiration, e.Value.options?.SlidingExpiration)).ToArray(), token),
+            SetMultipleEntriesAsync(entries.Select(e =>
+            {
+                var options = e.Value.options;
+                var absolute = options?.AbsoluteExpiration;
+                if (options?.AbsoluteExpirationRelativeToNow is { } relative)
+                    absolute = now.Add(relative);
+                return _entryHelper.Create(e.Key, e.Value.value, absolute, options?.SlidingExpiration);
+            }).ToArray(), token),
             "SetMultipleEntriesAsync<T>");
     }
 

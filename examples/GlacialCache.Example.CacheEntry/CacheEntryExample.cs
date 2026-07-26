@@ -1,8 +1,6 @@
 using System.Linq;
-using GlacialCache.PostgreSQL.Abstractions;
 using GlacialCache.PostgreSQL.Extensions;
-using GlacialCache.PostgreSQL.Models;
-using GlacialCache.PostgreSQL.Services;
+using GlacialCache.Abstractions;
 using MemoryPack;
 using Microsoft.Extensions.Caching.Distributed;
 

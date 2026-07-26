@@ -1,8 +1,6 @@
 using System.Diagnostics;
-using GlacialCache.PostgreSQL.Abstractions;
+using GlacialCache.Abstractions;
 using GlacialCache.PostgreSQL.Extensions;
-using GlacialCache.PostgreSQL.Models;
-using GlacialCache.PostgreSQL.Services;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;

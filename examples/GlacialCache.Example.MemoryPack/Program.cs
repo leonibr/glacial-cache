@@ -1,9 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
-using GlacialCache.PostgreSQL.Abstractions;
 using GlacialCache.PostgreSQL.Extensions;
-using GlacialCache.PostgreSQL.Models;
-using GlacialCache.PostgreSQL.Services;
+using GlacialCache.Abstractions;
 using MemoryPack;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
@@ -75,7 +73,6 @@ class Program
 
         // Get the cache service
         var cache = serviceProvider.GetRequiredService<IGlacialCache>();
-        var cacheEntryHelper = serviceProvider.GetRequiredService<CacheEntryHelper>();
 
         Console.WriteLine("🚀 GlacialCache PostgreSQL MemoryPack Example");
         Console.WriteLine("===========================================");

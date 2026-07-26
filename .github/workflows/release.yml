@@ -49,18 +49,24 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - run: dotnet restore src/GlacialCache.PostgreSQL/GlacialCache.PostgreSQL.csproj
+      - run: dotnet restore GlacialCache.sln
 
-      - run: dotnet build src/GlacialCache.PostgreSQL/GlacialCache.PostgreSQL.csproj --configuration Release --no-restore
+      - run: dotnet build GlacialCache.sln --configuration Release --no-restore
 
       - run: |
-          dotnet pack src/GlacialCache.PostgreSQL/GlacialCache.PostgreSQL.csproj \
-            --configuration Release \
-            --no-restore \
-            --output ./packages \
-            -p:PackageVersion=${{ steps.version.outputs.version }} \
-            -p:IncludeSymbols=true \
-            -p:SymbolPackageFormat=snupkg
+          for project in \
+            src/GlacialCache/GlacialCache.csproj \
+            src/GlacialCache.PostgreSQL/GlacialCache.PostgreSQL.csproj \
+            src/GlacialCache.SqlServer/GlacialCache.SqlServer.csproj
+          do
+            dotnet pack "$project" \
+              --configuration Release \
+              --no-restore \
+              --output ./packages \
+              -p:PackageVersion=${{ steps.version.outputs.version }} \
+              -p:IncludeSymbols=true \
+              -p:SymbolPackageFormat=snupkg
+          done
 
       - uses: actions/upload-artifact@v4
         with:

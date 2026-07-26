@@ -6,6 +6,7 @@ using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Npgsql;
+using NpgsqlTypes;
 using Testcontainers.PostgreSql;
 
 namespace GlacialCache.PostgreSQL.Tests.Integration;
@@ -70,6 +71,7 @@ public sealed class BatchWriteReadWorkflowIntegrationTests : IAsyncLifetime
         await VerifyReadFailurePreservesWritesAndLogsSuccessAsync();
         await VerifyReadCancellationPreservesWritesAndLogsSuccessAsync();
         await VerifyLargeBatchFallbackAsync();
+        await VerifyNoExpirationUsesPostgreSqlInfinityAsync();
     }
 
     private async Task VerifySuccessExpirationAndSlidingRefreshAsync()
@@ -246,6 +248,39 @@ public sealed class BatchWriteReadWorkflowIntegrationTests : IAsyncLifetime
         result.Count.ShouldBe(entries.Count);
         result["workflow:large:0"].ShouldBeEquivalentTo(BitConverter.GetBytes(0));
         result["workflow:large:1000"].ShouldBeEquivalentTo(BitConverter.GetBytes(1000));
+    }
+
+    private async Task VerifyNoExpirationUsesPostgreSqlInfinityAsync()
+    {
+        const string key = "workflow:no-expiration";
+        var now = DateTimeOffset.UtcNow;
+        var sql = RuntimeSqlBuilder.Build("public.glacial_cache", defaultAbsoluteExpirationRelativeToNow: null);
+
+        await using var connection = await OpenConnectionAsync();
+        await using (var setCommand = new NpgsqlCommand(sql.SetSql, connection))
+        {
+            setCommand.Parameters.AddWithValue("@Key", key);
+            setCommand.Parameters.AddWithValue("@Value", new byte[] { 13, 14 });
+            setCommand.Parameters.AddWithValue("@Now", now);
+            setCommand.Parameters.Add("@RelativeInterval", NpgsqlDbType.Interval).Value = DBNull.Value;
+            setCommand.Parameters.Add("@SlidingInterval", NpgsqlDbType.Interval).Value = DBNull.Value;
+            setCommand.Parameters.Add("@ValueType", NpgsqlDbType.Text).Value = DBNull.Value;
+            await setCommand.ExecuteNonQueryAsync();
+        }
+
+        await using (var getCommand = new NpgsqlCommand(sql.GetSql, connection))
+        {
+            getCommand.Parameters.AddWithValue("@Key", key);
+            getCommand.Parameters.AddWithValue("@Now", now.AddDays(2));
+            await using var reader = await getCommand.ExecuteReaderAsync();
+            (await reader.ReadAsync()).ShouldBeTrue();
+        }
+
+        await using var infinityCommand = new NpgsqlCommand(
+            "SELECT next_expiration = 'infinity'::timestamptz FROM public.glacial_cache WHERE key = $1",
+            connection);
+        infinityCommand.Parameters.AddWithValue(key);
+        (await infinityCommand.ExecuteScalarAsync()).ShouldBe(true);
     }
 
     private async Task<NpgsqlConnection> OpenConnectionAsync()

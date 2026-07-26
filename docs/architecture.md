@@ -1,12 +1,12 @@
 ## Architecture
 
-This page describes the high-level architecture of GlacialCache.PostgreSQL: major components, how requests flow through the system, how background maintenance works, and how connections are managed.
+This page describes the shared GlacialCache architecture and the PostgreSQL provider's database and maintenance components.
 
 ### Main components
 
 - **Public cache API**
 
-  - `GlacialCachePostgreSQL` implements both `IDistributedCache` and `IGlacialCache`.
+  - PostgreSQL implements the canonical `GlacialCache.Abstractions.IGlacialCache` and `IDistributedCache`.
   - Registered into DI via `AddGlacialCachePostgreSQL(...)` in `ServiceCollectionExtensions`.
   - Exposed as:
     - `IDistributedCache` for standard ASP.NET Core patterns.
@@ -25,15 +25,15 @@ This page describes the high-level architecture of GlacialCache.PostgreSQL: majo
 
 - **Serialization**
 
-  - `ICacheEntrySerializer` abstracts value serialization.
+  - `ICacheEntrySerializer`, `CacheEntryFactory`, `CacheEntry<T>`, and the full `IGlacialCache` contract live in the shared `GlacialCache` package.
   - Default implementations:
     - `MemoryPackCacheEntrySerializer` (binary, fastest).
     - `JsonCacheEntrySerializer` (UTF-8 JSON).
-  - `GlacialCacheEntryFactory` assembles `CacheEntry<T>` instances with metadata.
+  - The PostgreSQL `CacheEntryHelper` is a thin compatibility facade over the shared `CacheEntryFactory`.
 
 - **Cache Entry Factory**
 
-  - `GlacialCacheEntryFactory` creates and deserializes `CacheEntry<T>` instances
+  - `CacheEntryFactory` creates and deserializes `CacheEntry<T>` instances for every provider
   - Abstracts serialization strategy from cache operations
   - Handles type information and metadata injection
   - Enables unit testing with mock entries
@@ -242,6 +242,29 @@ await cache.SetMultipleAsync(largeDict); // 5000 items
 - Maximum batch size: 1000 items (hardcoded threshold)
 - Chunk size: 500 items per transaction
 - No configuration needed - automatic
+
+### Direct-memory batch writes
+
+`SetMultipleAsync` snapshots `ReadOnlyMemory<byte>` payloads before PostgreSQL executes the batch. This is the recommended default when callers may reuse or release their buffers while the operation is running.
+
+Use `SetMultipleDirectAsync` only when avoiding those payload copies is important. Direct-memory payloads remain caller-owned, so every backing buffer must stay alive, immutable, and undisposed until the returned task completes. This requirement also applies when the operation is canceled or fails, and for every chunk of batches larger than 1000 entries.
+
+The recommended pattern is to keep ownership in scope and await the write before releasing it:
+
+```csharp
+using var owner = MemoryPool<byte>.Shared.Rent(payloadLength);
+FillPayload(owner.Memory.Span[..payloadLength]);
+
+var entries = new Dictionary<string, (ReadOnlyMemory<byte>, DistributedCacheEntryOptions)>
+{
+    ["cache-key"] = (owner.Memory[..payloadLength], new DistributedCacheEntryOptions())
+};
+
+await cache.SetMultipleDirectAsync(entries, cancellationToken);
+// The owner can be disposed or returned to its pool after the await completes.
+```
+
+Do not start the write and release or reuse the buffer before awaiting it. The optimization eliminates explicit application payload copies; it does not claim that Npgsql or PostgreSQL performs end-to-end zero-copy I/O.
 
 **Performance Benefits**:
 

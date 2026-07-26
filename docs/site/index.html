@@ -276,13 +276,13 @@
                     or implement custom serializers
                   </p>
                   <div class="code-block">
-                    <pre><code class="language-csharp">// MemoryPack (Default - High Performance)
+                    <pre><code class="language-csharp">// JsonBytes (Default - Compatibility)
 builder.Services.AddGlacialCachePostgreSQL(options => {
-    options.Cache.Serializer = SerializerType.MemoryPack;
+    options.Cache.Serializer = SerializerType.JsonBytes;
 });
 
-// Or JSON for compatibility
-options.Cache.Serializer = SerializerType.JsonBytes;</code></pre>
+// Or MemoryPack for maximum performance
+options.Cache.Serializer = SerializerType.MemoryPack;</code></pre>
                   </div>
                 </div>
               </div>
@@ -717,20 +717,20 @@ builder.Services.AddGlacialCachePostgreSQL(options => {
               <h3 class="tab-panel-title">Flexible Serialization</h3>
               <p class="tab-panel-description">
                 Choose the serialization strategy that fits your needs:
-                high-performance MemoryPack (default), standards-based
-                System.Text.Json, or implement your own custom serializer.
+                standards-based JsonBytes (default), high-performance
+                MemoryPack, or implement your own custom serializer.
               </p>
               <div class="code-block">
-                <pre><code class="language-csharp">// Option 1: MemoryPack (Default - Highest Performance)
+                <pre><code class="language-csharp">// Option 1: JsonBytes (Default - Compatibility)
 builder.Services.AddGlacialCachePostgreSQL(options => {
     options.Connection.ConnectionString = connectionString;
-    options.Cache.Serializer = SerializerType.MemoryPack; // Default
+    options.Cache.Serializer = SerializerType.JsonBytes; // Default
 });
 
-// Option 2: JSON with System.Text.Json (Microsoft)
+// Option 2: MemoryPack — High Performance
 builder.Services.AddGlacialCachePostgreSQL(options => {
     options.Connection.ConnectionString = connectionString;
-    options.Cache.Serializer = SerializerType.JsonBytes;
+    options.Cache.Serializer = SerializerType.MemoryPack;
 });
 
 // Option 3: Custom Serializer

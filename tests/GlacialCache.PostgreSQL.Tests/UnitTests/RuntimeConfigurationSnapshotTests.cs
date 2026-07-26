@@ -68,6 +68,39 @@ public sealed class RuntimeConfigurationSnapshotTests
     }
 
     [Fact]
+    public void FromOptions_UpsertSql_ReplacesValueTypeOnConflict()
+    {
+        var sql = RuntimeConfigurationSnapshot.FromOptions(CreateOptions()).Cache.Sql;
+
+        sql.SetSql.ShouldContain("value_type = EXCLUDED.value_type");
+        sql.SetMultipleSql.ShouldContain("value_type = EXCLUDED.value_type");
+        sql.SetMultipleBulkSql.ShouldContain("value_type = EXCLUDED.value_type");
+    }
+
+    [Fact]
+    public void FromOptions_WithoutDefaultExpiration_UsesPostgreSqlInfinity()
+    {
+        var sql = RuntimeConfigurationSnapshot.FromOptions(CreateOptions(
+            defaultAbsoluteExpirationRelativeToNow: null)).Cache.Sql;
+
+        sql.SetSql.ShouldContain("ELSE 'infinity'::timestamptz");
+        sql.SetMultipleSql.ShouldContain("ELSE 'infinity'::timestamptz");
+        sql.SetMultipleBulkSql.ShouldContain("ELSE 'infinity'::timestamptz");
+        sql.GetSql.ShouldContain("ELSE 'infinity'::timestamptz");
+        sql.GetMultipleSql.ShouldContain("ELSE 'infinity'::timestamptz");
+    }
+
+    [Fact]
+    public void FromOptions_CleanupSql_DeletesAtMostConfiguredParameterBatch()
+    {
+        var cleanupSql = RuntimeConfigurationSnapshot.FromOptions(CreateOptions()).Cache.Sql.CleanupExpiredSql;
+
+        cleanupSql.ShouldContain("LIMIT @maxBatchSize");
+        cleanupSql.ShouldContain("DELETE FROM public.glacial_cache");
+        cleanupSql.ShouldContain("USING expired");
+    }
+
+    [Fact]
     public void Publisher_PublishesWholeSnapshotAtomicallyOnReload()
     {
         var monitor = new TestOptionsMonitor(CreateOptions(

@@ -15,7 +15,7 @@ CREATE TABLE public.glacial_cache (
     absolute_expiration TIMESTAMPTZ,
     sliding_interval INTERVAL,
     next_expiration TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    value_type VARCHAR(255),
+    value_type TEXT,
     value_size INTEGER GENERATED ALWAYS AS (OCTET_LENGTH(value)) STORED
 );
 
@@ -169,7 +169,7 @@ GlacialCache provides strongly-typed cache operations through generic methods, e
 The `CacheEntry<T>` record provides rich metadata about cached values:
 
 ```csharp
-public sealed record CacheEntry<T>
+public record CacheEntry<T>
 {
     public string Key { get; init; }
     public T Value { get; init; }
@@ -185,7 +185,7 @@ public sealed record CacheEntry<T>
 
 ### Type-Safe Operations
 
-Cast `IDistributedCache` to `IGlacialCache` to access typed methods:
+Inject the canonical `GlacialCache.Abstractions.IGlacialCache` to access typed methods with either provider:
 
 ```csharp
 public class ProductService
@@ -275,8 +275,8 @@ await cache.SetMultipleEntriesAsync(entries);
 
 Typed operations use the configured serializer (`MemoryPack` or `JsonBytes`):
 
-- **MemoryPack** (default): High-performance binary serialization, smallest size
-- **JsonBytes**: Human-readable, better debugging, cross-platform compatibility
+- **JsonBytes** (default): Human-readable, better debugging, cross-platform compatibility
+- **MemoryPack**: High-performance binary serialization, smallest size
 
 Both serializers optimize for common types:
 

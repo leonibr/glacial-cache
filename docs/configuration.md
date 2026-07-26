@@ -277,14 +277,14 @@ builder.Services.AddGlacialCachePostgreSQL(options =>
 #### `Serializer` ✅
 
 - **Type**: `SerializerType` enum
-- **Default**: `SerializerType.MemoryPack`
+- **Default**: `SerializerType.JsonBytes`
 - **Validation**: Must be valid enum value
 - **When to Use**:
+  - `JsonBytes`: Interoperability with other languages/tools (default)
   - `MemoryPack`: High performance, .NET-focused applications
-  - `JsonBytes`: Interoperability with other languages/tools
   - `Custom`: Specialized serialization requirements
 - **Impact**: Affects storage size, performance, and compatibility. Not reloadable.
-- **Example**: `SerializerType.JsonBytes` for debugging or cross-platform needs
+- **Example**: `SerializerType.MemoryPack` for maximum performance
 
 #### `CustomSerializerType` ✅
 
@@ -1868,6 +1868,12 @@ The reloadable configuration system uses:
 - `IOptionsMonitor<GlacialCachePostgreSQLOptions>` for external changes
 - `ObservableProperty<T>` pattern for internal change propagation
 - Automatic resource recreation when critical properties change
+
+### Runtime Reload Callback Contract
+
+Runtime reload callbacks run synchronously on the configuration change-notification path. Callback handlers must stay fast, must be thread-safe, and should not block on database or network work. If a runtime subscriber or `ObservableProperty<T>` handler throws, the exception is propagated to the caller that initiated the reload and later subscribers on that callback path are not invoked.
+
+Direct `ObservableProperty<T>` callbacks remain a compatibility path. For sensitive properties such as `Connection.ConnectionString`, the `PropertyChangedEventArgs<T>` payload can still contain the raw old and new values so internal components can rebuild runtime state. Generic observable logs redact sensitive values, and callback handlers must not log raw `PropertyChangedEventArgs<T>` values directly.
 
 ### Supported Reloadable Properties
 

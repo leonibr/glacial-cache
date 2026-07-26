@@ -38,25 +38,24 @@ internal class CleanupBackgroundService : BackgroundService, ICleanupBackgroundS
         _dbRawCommands = dbRawCommands;
         _electionState = electionState;
         _timeProvider = timeProvider;
-        _cleanupTimer = new PeriodicTimer(_options.Maintenance.CleanupInterval);
+        _cleanupTimer = new PeriodicTimer(_options.Maintenance.CleanupInterval, timeProvider);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // Check if this instance should perform cleanup based on manager election
-        if (_options.Infrastructure.EnableManagerElection &&
-            (_electionState == null || !_electionState.IsManager))
-        {
-            _logger.LogCleanupServiceSkipped();
-            return;
-        }
-
         _logger.LogCleanupServiceStarted(_options.Maintenance.CleanupInterval.TotalMinutes);
 
         try
         {
             while (await _cleanupTimer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
             {
+                if (_options.Infrastructure.EnableManagerElection &&
+                    (_electionState == null || !_electionState.IsManager))
+                {
+                    _logger.LogCleanupServiceSkipped();
+                    continue;
+                }
+
                 await ExecuteCleanupAsync(stoppingToken);
             }
         }
@@ -87,8 +86,11 @@ internal class CleanupBackgroundService : BackgroundService, ICleanupBackgroundS
         {
             await using var connection = await _dataSource.GetConnectionAsync(token);
 
-            await using var command = new NpgsqlCommand(_dbRawCommands.CleanupExpiredSql, connection);
-            command.Parameters.AddWithValue("@now", _timeProvider.GetUtcNow());
+            await using var command = CreateCleanupCommand(
+                _dbRawCommands.CleanupExpiredSql,
+                connection,
+                _timeProvider.GetUtcNow(),
+                _options.Maintenance.MaxCleanupBatchSize);
 
             var deletedCount = await command.ExecuteNonQueryAsync(token).ConfigureAwait(false);
 
@@ -112,6 +114,18 @@ internal class CleanupBackgroundService : BackgroundService, ICleanupBackgroundS
             // Actual error - log at error level
             _logger.LogCleanupError(ex);
         }
+    }
+
+    internal static NpgsqlCommand CreateCleanupCommand(
+        string sql,
+        NpgsqlConnection connection,
+        DateTimeOffset now,
+        int maxBatchSize)
+    {
+        var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@now", now);
+        command.Parameters.AddWithValue("@maxBatchSize", maxBatchSize);
+        return command;
     }
 
     private static bool IsShutdownException(Exception ex)

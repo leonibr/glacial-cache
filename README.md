@@ -85,8 +85,12 @@ GlacialCache has one provider-neutral `GlacialCache.Abstractions.IGlacialCache` 
 
    var builder = WebApplication.CreateBuilder(args);
 
-   builder.Services.AddGlacialCachePostgreSQL(
-       "Host=localhost;Database=myapp;Username=postgres;Password=mypassword");
+   builder.Services.AddGlacialCachePostgreSQL(options =>
+   {
+       options.Connection.ConnectionString =
+           "Host=localhost;Database=myapp;Username=postgres;Password=mypassword";
+       options.Infrastructure.CreateInfrastructure = true;
+   });
 
    var app = builder.Build();
    ```

@@ -2,7 +2,6 @@
     <PropertyGroup>
         <!-- Enable NuGet package lock files -->
         <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
-        <NuGetLockFilePath>$(MSBuildThisFileDirectory)packages.lock.json</NuGetLockFilePath>
 
 
         <ImplicitUsings>enable</ImplicitUsings>

@@ -49,15 +49,14 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - run: dotnet restore GlacialCache.sln
+      - run: dotnet restore GlacialCache.sln --locked-mode
 
       - run: dotnet build GlacialCache.sln --configuration Release --no-restore
 
       - run: |
           for project in \
             src/GlacialCache/GlacialCache.csproj \
-            src/GlacialCache.PostgreSQL/GlacialCache.PostgreSQL.csproj \
-            src/GlacialCache.SqlServer/GlacialCache.SqlServer.csproj
+            src/GlacialCache.PostgreSQL/GlacialCache.PostgreSQL.csproj
           do
             dotnet pack "$project" \
               --configuration Release \

@@ -167,7 +167,14 @@ public static class ServiceCollectionExtensions
             return new ManagerElectionService(options, logger, dataSource, timeProvider);
         });
 
-        services.AddHostedService<ElectionBackgroundService>();
+        services.TryAddSingleton<ElectionBackgroundService>();
+        services.AddHostedService(sp =>
+        {
+            var options = sp.GetRequiredService<IOptionsMonitor<GlacialCachePostgreSQLOptions>>();
+            return options.CurrentValue.Infrastructure.EnableManagerElection
+                ? sp.GetRequiredService<ElectionBackgroundService>()
+                : new NullBackgroundService() as BackgroundService;
+        });
 
 
         services.TryAddSingleton<CleanupBackgroundService>(sp =>

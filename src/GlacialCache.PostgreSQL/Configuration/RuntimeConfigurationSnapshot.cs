@@ -155,13 +155,13 @@ internal static class RuntimeSqlBuilder
     private static string GetNextExpirationCaseStatement(
         string absoluteExp = "absolute_expiration",
         string slidingInt = "sliding_interval",
-        string defaultInterval = "interval '1 day'",
+        string defaultExpiration = "'infinity'::timestamptz",
         string nowParam = "@now")
     => $@"CASE
             WHEN {absoluteExp} IS NOT NULL AND {slidingInt} IS NULL THEN {absoluteExp}
             WHEN {absoluteExp} IS NOT NULL AND {slidingInt} IS NOT NULL THEN LEAST({nowParam} + {slidingInt}, {absoluteExp})
             WHEN {absoluteExp} IS NULL AND {slidingInt} IS NOT NULL THEN {nowParam} + {slidingInt}
-            ELSE {nowParam} + {defaultInterval}
+            ELSE {defaultExpiration}
         END";
 
     private static string GetNextExpirationForInsert(
@@ -170,14 +170,15 @@ internal static class RuntimeSqlBuilder
         string slidingParam = "@slidingInterval",
         string nowParam = "@now")
     {
-        var defaultInterval = defaultAbsoluteExpirationRelativeToNow ?? TimeSpan.FromDays(1);
-        var defaultIntervalSql = $"interval '{Math.Max(1, (int)defaultInterval.TotalDays)} days'";
+        var defaultExpirationSql = defaultAbsoluteExpirationRelativeToNow.HasValue
+            ? $"{nowParam} + interval '{Math.Max(1, (int)defaultAbsoluteExpirationRelativeToNow.Value.TotalDays)} days'"
+            : "'infinity'::timestamptz";
 
         return $@"CASE
             WHEN {relativeParam} IS NOT NULL AND {slidingParam} IS NOT NULL THEN LEAST({nowParam} + {relativeParam}, {nowParam} + {slidingParam})
             WHEN {slidingParam} IS NOT NULL THEN {nowParam} + {slidingParam}
             WHEN {relativeParam} IS NOT NULL THEN {nowParam} + {relativeParam}
-            ELSE {nowParam} + {defaultIntervalSql}
+            ELSE {defaultExpirationSql}
         END";
     }
 
@@ -187,20 +188,21 @@ internal static class RuntimeSqlBuilder
         string slidingParam = "$4",
         string nowParam = "$6")
     {
-        var defaultInterval = defaultAbsoluteExpirationRelativeToNow ?? TimeSpan.FromDays(1);
-        var defaultIntervalSql = $"interval '{Math.Max(1, (int)defaultInterval.TotalDays)} days'";
+        var defaultExpirationSql = defaultAbsoluteExpirationRelativeToNow.HasValue
+            ? $"{nowParam} + interval '{Math.Max(1, (int)defaultAbsoluteExpirationRelativeToNow.Value.TotalDays)} days'"
+            : "'infinity'::timestamptz";
 
         return $@"CASE
             WHEN {relativeParam} IS NOT NULL AND {slidingParam} IS NOT NULL THEN LEAST({nowParam} + {relativeParam}, {nowParam} + {slidingParam})
             WHEN {slidingParam} IS NOT NULL THEN {nowParam} + {slidingParam}
             WHEN {relativeParam} IS NOT NULL THEN {nowParam} + {relativeParam}
-            ELSE {nowParam} + {defaultIntervalSql}
+            ELSE {defaultExpirationSql}
         END";
     }
 
     private static string BuildGetSql(string fullTableName) => $@"
                 UPDATE {fullTableName}
-                SET next_expiration = {GetNextExpirationCaseStatement("absolute_expiration", "sliding_interval", "interval '1 day'", "@Now")}
+                SET next_expiration = {GetNextExpirationCaseStatement("absolute_expiration", "sliding_interval", "'infinity'::timestamptz", "@Now")}
                 WHERE key = @Key AND next_expiration > @Now
                 RETURNING
                     value,
@@ -212,7 +214,7 @@ internal static class RuntimeSqlBuilder
 
     private static string BuildGetSqlCore(string fullTableName) => $@"
                 UPDATE {fullTableName}
-                SET next_expiration = {GetNextExpirationCaseStatement("absolute_expiration", "sliding_interval", "interval '1 day'", "@Now")}
+                SET next_expiration = {GetNextExpirationCaseStatement("absolute_expiration", "sliding_interval", "'infinity'::timestamptz", "@Now")}
                 WHERE key = @Key AND next_expiration > @Now
                 RETURNING value";
 
@@ -224,6 +226,7 @@ internal static class RuntimeSqlBuilder
             ON CONFLICT (key)
             DO UPDATE SET
                 value = EXCLUDED.value,
+                value_type = EXCLUDED.value_type,
                 absolute_expiration = EXCLUDED.absolute_expiration,
                 sliding_interval = EXCLUDED.sliding_interval,
                 next_expiration = EXCLUDED.next_expiration";
@@ -234,18 +237,26 @@ internal static class RuntimeSqlBuilder
 
     private static string BuildRefreshSql(string fullTableName) => $@"
             UPDATE {fullTableName} 
-            SET next_expiration = {GetNextExpirationCaseStatement("absolute_expiration", "sliding_interval", "interval '1 day'", "@Now")}
+            SET next_expiration = {GetNextExpirationCaseStatement("absolute_expiration", "sliding_interval", "'infinity'::timestamptz", "@Now")}
             WHERE key = @Key AND sliding_interval IS NOT NULL
             AND next_expiration > @Now";
 
     private static string BuildCleanupExpiredSql(string fullTableName) => $@"
-            DELETE FROM {fullTableName}
-            WHERE next_expiration <= @now";
+            WITH expired AS (
+                SELECT key
+                FROM {fullTableName}
+                WHERE next_expiration <= @now
+                ORDER BY next_expiration
+                LIMIT @maxBatchSize
+            )
+            DELETE FROM {fullTableName} AS cache
+            USING expired
+            WHERE cache.key = expired.key";
 
     private static string BuildGetMultipleSql(string fullTableName) => $@"
             UPDATE {fullTableName}
             SET 
-                next_expiration = {GetNextExpirationCaseStatement("absolute_expiration", "sliding_interval", "interval '1 day'", "@now")}                 
+                next_expiration = {GetNextExpirationCaseStatement("absolute_expiration", "sliding_interval", "'infinity'::timestamptz", "@now")}
             WHERE key = ANY(@keys) AND next_expiration > @now
             RETURNING 
                 key, value, absolute_expiration, sliding_interval, 
@@ -257,6 +268,7 @@ internal static class RuntimeSqlBuilder
             ON CONFLICT (key)
             DO UPDATE SET
                 value = EXCLUDED.value,
+                value_type = EXCLUDED.value_type,
                 absolute_expiration = EXCLUDED.absolute_expiration,
                 sliding_interval = EXCLUDED.sliding_interval,
                 next_expiration = EXCLUDED.next_expiration";
@@ -275,6 +287,7 @@ internal static class RuntimeSqlBuilder
             ON CONFLICT (key)
             DO UPDATE SET
                 value = EXCLUDED.value,
+                value_type = EXCLUDED.value_type,
                 absolute_expiration = EXCLUDED.absolute_expiration,
                 sliding_interval = EXCLUDED.sliding_interval,
                 next_expiration = EXCLUDED.next_expiration";
@@ -283,7 +296,7 @@ internal static class RuntimeSqlBuilder
 
     private static string BuildRefreshMultipleSql(string fullTableName) => $@"
             UPDATE {fullTableName} 
-            SET next_expiration = {GetNextExpirationCaseStatement("absolute_expiration", "sliding_interval", "interval '1 day'", "@now")}
+            SET next_expiration = {GetNextExpirationCaseStatement("absolute_expiration", "sliding_interval", "'infinity'::timestamptz", "@now")}
             WHERE key = ANY(@keys) 
                 AND sliding_interval IS NOT NULL
                 AND  next_expiration > @now";

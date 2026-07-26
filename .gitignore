@@ -8,6 +8,7 @@
 
 # Local agent configuration
 .agents/
+skills-lock.json
 
 # User-specific files
 *.rsuser

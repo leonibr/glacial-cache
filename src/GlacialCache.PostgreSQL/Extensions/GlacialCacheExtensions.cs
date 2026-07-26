@@ -16,7 +16,7 @@ public static class GlacialCacheExtensions
     /// <param name="key">The key of the cache entry to retrieve.</param>
     /// <param name="token">Cancellation token.</param>
     /// <returns>The cache entry if found and not expired; otherwise, null.</returns>
-    public static async Task<CacheEntry<byte[]>?> GetAsync(this global::GlacialCache.Abstractions.IGlacialCache cache, string key, CancellationToken token = default)
+    public static async Task<CacheEntry<byte[]>?> GetAsync(this IGlacialCache cache, string key, CancellationToken token = default)
     {
         return await cache.GetEntryAsync(key, token);
     }
@@ -28,7 +28,7 @@ public static class GlacialCacheExtensions
     /// <param name="entry">The cache entry to set.</param>
     /// <param name="token">Cancellation token.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
-    public static async Task SetAsync(this global::GlacialCache.Abstractions.IGlacialCache cache, CacheEntry<byte[]> entry, CancellationToken token = default)
+    public static async Task SetAsync(this IGlacialCache cache, CacheEntry<byte[]> entry, CancellationToken token = default)
     {
         await cache.SetEntryAsync(entry, token);
     }
@@ -42,7 +42,7 @@ public static class GlacialCacheExtensions
     /// <returns>The cache entry if found and not expired; otherwise, null.</returns>
     public static async Task<CacheEntry<byte[]>?> GetAsync(this IDistributedCache cache, string key, CancellationToken token = default)
     {
-        if (cache is global::GlacialCache.Abstractions.IGlacialCache GlacialCache)
+        if (cache is IGlacialCache GlacialCache)
         {
             return await GlacialCache.GetEntryAsync(key, token);
         }
@@ -72,7 +72,7 @@ public static class GlacialCacheExtensions
     /// <returns>A task representing the asynchronous operation.</returns>
     public static async Task SetAsync(this IDistributedCache cache, CacheEntry<byte[]> entry, CancellationToken token = default)
     {
-        if (cache is global::GlacialCache.Abstractions.IGlacialCache GlacialCache)
+        if (cache is IGlacialCache GlacialCache)
         {
             await GlacialCache.SetEntryAsync(entry, token);
             return;

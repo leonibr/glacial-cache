@@ -1,6 +1,6 @@
 # GlacialCache abstractions
 
-Provider-neutral contracts and typed behavior shared by the PostgreSQL and SQL Server packages. This package is the canonical home of `IGlacialCache`, `CacheEntry<T>`, `ICacheEntry`, `ICacheEntrySerializer`, the MemoryPack serializer, and the cache-entry factory.
+Provider-neutral contracts and typed behavior used by GlacialCache providers. This package is the canonical home of `IGlacialCache`, `CacheEntry<T>`, `ICacheEntry`, `ICacheEntrySerializer`, the MemoryPack serializer, and the cache-entry factory.
 
 `IGlacialCache` exposes the same byte, rich-entry, typed, and batch surface for every provider. Applications should import `GlacialCache.Abstractions` and can switch providers without changing cache-facing code.
 

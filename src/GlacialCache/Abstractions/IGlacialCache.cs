@@ -4,9 +4,15 @@ namespace GlacialCache.Abstractions;
 
 /// <summary>
 /// Provider-neutral distributed cache contract with efficient batch operations.
+/// On .NET 9 and later, the contract also exposes low-allocation buffer operations.
 /// Database providers own the persistence semantics behind this interface.
 /// </summary>
-public interface IGlacialCache : IDistributedCache
+public interface IGlacialCache :
+#if NET9_0_OR_GREATER
+    IBufferDistributedCache
+#else
+    IDistributedCache
+#endif
 {
     Task<Dictionary<string, byte[]?>> GetMultipleAsync(
         IEnumerable<string> keys,

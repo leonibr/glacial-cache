@@ -169,7 +169,7 @@ public class PolicyFactory : IPolicyFactory
             "08006" => true, // Connection failure - connection lost during operation
             "08000" => true, // Connection exception - general connection problem
             "08003" => true, // Connection does not exist - connection was closed
-            "08004" => true, // SQL server rejected establishment of SQL connection - server overload
+            "08004" => true, // Database server rejected establishment of SQL connection - server overload
             "08007" => true, // Connection failure during transaction - network interruption
 
             // Resource exhaustion (likely temporary)

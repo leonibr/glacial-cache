@@ -4,13 +4,13 @@ using System.Text.Json.Serialization;
 using System.Text.Encodings.Web;
 
 namespace GlacialCache.PostgreSQL.Serializers;
-using Abstractions;
+using GlacialCache.Abstractions;
 
 /// <summary>
 /// JSON-based implementation of ICacheEntrySerializer using System.Text.Json with performance optimizations.
 /// Provides string optimization and high-performance JSON serialization for complex objects.
 /// </summary>
-public class JsonCacheEntrySerializer : global::GlacialCache.Abstractions.ICacheEntrySerializer
+public class JsonCacheEntrySerializer : ICacheEntrySerializer
 {
     private static readonly JsonSerializerOptions HighPerformanceOptions = new()
     {

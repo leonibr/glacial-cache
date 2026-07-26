@@ -85,7 +85,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
 
         // Register serializer and factory services
-        services.TryAddSingleton<global::GlacialCache.Abstractions.ICacheEntrySerializer>(sp =>
+        services.TryAddSingleton<ICacheEntrySerializer>(sp =>
         {
             var options = sp.GetRequiredService<IOptionsMonitor<GlacialCachePostgreSQLOptions>>();
             var cacheOptions = options.CurrentValue.Cache;
@@ -94,7 +94,7 @@ public static class ServiceCollectionExtensions
             {
                 SerializerType.JsonBytes => new JsonCacheEntrySerializer(),
                 SerializerType.Custom => CreateCustomSerializer(sp, cacheOptions.CustomSerializerType),
-                _ => new global::GlacialCache.Abstractions.MemoryPackCacheEntrySerializer(),
+                _ => new MemoryPackCacheEntrySerializer(),
             };
         });
         services.TryAddSingleton<CacheEntryHelper>();
@@ -127,7 +127,10 @@ public static class ServiceCollectionExtensions
         services.TryAddTransient<ILogger<GlacialCachePostgreSQL>>(sp =>
             sp.GetService<ILoggerFactory>()?.CreateLogger<GlacialCachePostgreSQL>() ?? NullLogger<GlacialCachePostgreSQL>.Instance);
         services.TryAddSingleton<IDistributedCache>(sp => sp.GetRequiredService<GlacialCachePostgreSQL>());
-        services.TryAddSingleton<global::GlacialCache.Abstractions.IGlacialCache>(sp => sp.GetRequiredService<GlacialCachePostgreSQL>());
+#if NET9_0_OR_GREATER
+        services.TryAddSingleton<IBufferDistributedCache>(sp => sp.GetRequiredService<GlacialCachePostgreSQL>());
+#endif
+        services.TryAddSingleton<IGlacialCache>(sp => sp.GetRequiredService<GlacialCachePostgreSQL>());
 
         // Resilience patterns services
         services.TryAddSingleton<IPolicyFactory>(sp =>
@@ -258,15 +261,15 @@ public static class ServiceCollectionExtensions
     /// <param name="customType">The custom serializer type.</param>
     /// <returns>An instance of the custom serializer.</returns>
     /// <exception cref="InvalidOperationException">Thrown when custom type is invalid.</exception>
-    private static global::GlacialCache.Abstractions.ICacheEntrySerializer CreateCustomSerializer(IServiceProvider sp, Type? customType)
+    private static ICacheEntrySerializer CreateCustomSerializer(IServiceProvider sp, Type? customType)
     {
         if (customType == null)
             throw new InvalidOperationException("CustomSerializerType must be specified when using SerializerType.Custom");
 
-        if (!typeof(global::GlacialCache.Abstractions.ICacheEntrySerializer).IsAssignableFrom(customType))
+        if (!typeof(ICacheEntrySerializer).IsAssignableFrom(customType))
             throw new InvalidOperationException($"Custom serializer type {customType.Name} must implement ICacheEntrySerializer");
 
         // Try to create instance using DI container first, fallback to Activator
-        return (global::GlacialCache.Abstractions.ICacheEntrySerializer)(sp.GetService(customType) ?? Activator.CreateInstance(customType)!);
+        return (ICacheEntrySerializer)(sp.GetService(customType) ?? Activator.CreateInstance(customType)!);
     }
 }

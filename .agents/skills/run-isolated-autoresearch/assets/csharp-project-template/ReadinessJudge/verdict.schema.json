@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["judgeId", "status", "ratings", "criticalBlockers", "evidenceGaps"],
+  "properties": {
+    "judgeId": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["ready", "conditional", "not_ready", "inconclusive"] },
+    "ratings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["integration", "reliability", "operational", "security", "maintainability", "observability", "rollout"],
+      "properties": {
+        "integration": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "reliability": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "operational": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "security": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "maintainability": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "observability": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "rollout": { "type": "integer", "minimum": 0, "maximum": 4 }
+      }
+    },
+    "criticalBlockers": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "semantic_contract_violation",
+          "data_loss_or_corruption_risk",
+          "credential_or_secret_exposure",
+          "unbounded_resource_or_availability_risk",
+          "no_safe_rollback_for_irreversible_change"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "evidenceGaps": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+  }
+}

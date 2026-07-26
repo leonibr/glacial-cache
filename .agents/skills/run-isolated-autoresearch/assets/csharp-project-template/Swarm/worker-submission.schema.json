@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["experimentId", "workerId", "hypothesis", "candidateCommit", "parentBestCommit", "changedPaths"],
+  "properties": {
+    "experimentId": { "type": "string", "minLength": 1 },
+    "workerId": { "type": "string", "minLength": 1 },
+    "hypothesis": { "type": "string", "minLength": 1 },
+    "candidateCommit": { "type": "string", "minLength": 7 },
+    "parentBestCommit": { "type": "string", "minLength": 7 },
+    "changedPaths": { "type": "array", "items": { "const": "Candidate/Candidate.cs" }, "minItems": 1, "maxItems": 1 }
+  }
+}

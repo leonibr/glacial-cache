@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "contractConfigured": false,
+  "targetSlice": "{{TARGET_SLICE}}",
+  "baseCommit": "{{BASE_COMMIT}}",
+  "seriesId": "series-001",
+  "requiredGates": ["{{REQUIRED_GATE_NAME}}"],
+  "requiredScenarios": ["{{REQUIRED_SCENARIO_NAME}}"],
+  "metric": {
+    "name": "{{METRIC_NAME}}",
+    "direction": "{{SCORE_DIRECTION}}",
+    "confidenceIntervalMustExcludeZero": true,
+    "maximumWorstScenarioRegressionPercent": 5.0
+  },
+  "trials": {
+    "design": "paired-randomized-ab",
+    "seed": 104729,
+    "scoutPairs": 3,
+    "promotionPairs": 7,
+    "reproductionPairs": 11
+  },
+  "artifacts": {
+    "evaluation": "artifacts/evaluation.json",
+    "readinessEvidence": "artifacts/readiness-evidence.json",
+    "readinessVerdict": "artifacts/readiness-verdict.json"
+  }
+}

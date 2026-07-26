@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "runtimeImplemented": false,
+  "stateStore": "none",
+  "queueSemantics": "single serialized evaluation authority",
+  "lease": {
+    "requiredFields": ["experimentId", "workerId", "candidateCommit", "baseBestCommit", "expiresAtUtc"],
+    "staleResultsMayPromote": false
+  },
+  "budgets": {
+    "maxConcurrentScouts": 2,
+    "maxConcurrentWorkers": 2,
+    "maxConcurrentEvaluators": 1,
+    "maxHypothesesPerWorker": 10
+  },
+  "prohibitedCoordinatorActions": ["edit_candidate", "run_canonical_evaluation", "select_winner", "access_holdout"]
+}

@@ -1,0 +1,13 @@
+run.log
+results.tsv
+artifacts/
+ControlPlane/state.db*
+bin/
+obj/
+TestResults/
+BenchmarkDotNet.Artifacts/
+*.user
+*.suo
+.env
+*.secrets.json
+Environment/.secrets/

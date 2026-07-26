@@ -1,0 +1,1 @@
+timestamp_utc	series_id	experiment_id	worker_id	candidate_commit	parent_best_commit	tier	hypothesis	score	metric	ci_low	ci_high	worst_regression_pct	gate_exit	research_decision	readiness_status	environment_fingerprint	notes

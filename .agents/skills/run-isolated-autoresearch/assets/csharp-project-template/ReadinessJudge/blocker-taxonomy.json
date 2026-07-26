@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "critical": [
+    "semantic_contract_violation",
+    "data_loss_or_corruption_risk",
+    "credential_or_secret_exposure",
+    "unbounded_resource_or_availability_risk",
+    "no_safe_rollback_for_irreversible_change"
+  ]
+}

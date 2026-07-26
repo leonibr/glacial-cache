@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "advisoryOnly": true,
+  "ratingScale": { "minimum": 0, "maximum": 4 },
+  "dimensions": {
+    "integration": 20,
+    "reliability": 20,
+    "operational": 15,
+    "security": 15,
+    "maintainability": 15,
+    "observability": 10,
+    "rollout": 5
+  },
+  "aggregation": "median rating per dimension, then weighted percentage",
+  "statuses": {
+    "ready": "score >= 80, every dimension >= 2, and no consensus critical blocker",
+    "conditional": "score >= 65 and < 80, every dimension >= 2, and no consensus critical blocker",
+    "not_ready": "score < 65 or a consensus critical blocker",
+    "inconclusive": "missing evidence, judge failure, or unresolved disagreement"
+  },
+  "criticalBlockerConsensus": "at least 2 of 3 primary judges",
+  "judges": { "primary": 3, "maximumAdjudicators": 1, "toolsAllowed": false, "blinded": true },
+  "calibrationRequired": {
+    "criticalBlockerRecall": 1.0,
+    "maximumFalsePositiveBlockerRate": 0.10,
+    "minimumWeightedKappa": 0.70
+  }
+}

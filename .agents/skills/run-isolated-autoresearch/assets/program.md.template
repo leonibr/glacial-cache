@@ -1,0 +1,55 @@
+# {{TARGET_SLICE}} isolated autoresearch
+
+## Immutable contract
+
+- Base commit: `{{BASE_COMMIT}}`
+- Baseline provenance and representation: `{{BASELINE_PROVENANCE}}`
+- Existing-lab/import provenance: `{{LAB_PROVENANCE}}`
+- Dedicated worktree: `{{WORKTREE_PATH}}`
+- Candidate paths: `{{CANDIDATE_PATHS}}`
+- Protected paths: `{{PROTECTED_PATHS}}`
+- Setup command: `{{SETUP_COMMAND}}`
+- Evaluation command: `{{EVALUATION_COMMAND}}`
+- Instrumentation method and claim: `{{INSTRUMENTATION_METHOD}}`
+- Primary score: `{{SCORE_DEFINITION}}`
+- Direction: `{{SCORE_DIRECTION}}`
+- Scenario duration: `{{SCENARIO_DURATION}}`
+- Trial duration: `{{TRIAL_DURATION}}`
+- Confirmation trial count: `{{CONFIRMATION_TRIALS}}`
+- Total experiment budget: `{{TOTAL_EXPERIMENT_BUDGET}}`
+- Hard process timeout: `{{PROCESS_TIMEOUT}}`
+- Hard gates: `{{HARD_GATES}}`
+- Minimum improvement above noise: `{{NOISE_THRESHOLD}}`
+- External pins and resolved image digests: `{{EXTERNAL_PINS}}`
+- Results ledger: `{{RESULTS_PATH}}`
+- Ledger policy: `{{LEDGER_POLICY}}`
+- Run log: `{{RUN_LOG_PATH}}`
+
+The evaluator, workload, baseline, seed, gates, score, instrumentation, scenario/trial timing, confirmation count, total budget, timeout, external pins, ledger policy, and parser are immutable after the baseline. If any changes, start a new results series and rerun the baseline.
+
+## Objective and boundaries
+
+Optimize {{TARGET_BEHAVIOR}} while preserving {{REQUIRED_SEMANTICS}}.
+
+Do not optimize or integrate {{OUT_OF_SCOPE}}.
+
+## Experiment loop
+
+1. Start with candidate content matching the last confirmed winner. Recovery `HEAD` may be newer; record the winner as `parent_best_commit`.
+2. State one falsifiable hypothesis.
+3. Verify protected paths are unchanged; edit only the candidate paths.
+4. Commit the hypothesis with repository-configured user attribution.
+5. Run the evaluation under the fixed budget and timeout, redirecting verbose output to the run log.
+6. Require `status=<pass|fail> score=<number> metric=<name> direction=<maximize|minimize>`.
+7. Append one TSV row. Reject hard-gate failures and results inside the noise band.
+8. Confirm apparent wins for the declared number of trials. Keep only credible improvements.
+9. Revert rejected experiments recoverably, then restore candidate content to the best state before another hypothesis. Never use hard reset or broad checkout restoration.
+10. Periodically rerun the baseline and check for evaluator drift or score gaming.
+
+Scenario sweeps belong inside one evaluation and do not count as research iterations.
+
+## Stop conditions
+
+Stop when {{STOP_CONDITIONS}}.
+
+Reproduce the winner in a fresh worktree and prepare an evidence-backed integration brief, preserving the runtime ledger according to its frozen policy. Do not modify production code without a separate explicit request.

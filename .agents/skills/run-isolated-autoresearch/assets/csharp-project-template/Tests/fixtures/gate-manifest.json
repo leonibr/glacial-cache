@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "contractConfigured": true,
+  "targetSlice": "fixture-slice",
+  "baseCommit": "1111111111111111111111111111111111111111",
+  "seriesId": "fixture-series-001",
+  "requiredGates": ["semantics"],
+  "requiredScenarios": ["representative"],
+  "metric": {
+    "name": "validated_workflows_per_second",
+    "direction": "maximize",
+    "confidenceIntervalMustExcludeZero": true,
+    "maximumWorstScenarioRegressionPercent": 5.0
+  },
+  "trials": {
+    "design": "paired-randomized-ab",
+    "seed": 104729,
+    "scoutPairs": 3,
+    "promotionPairs": 7,
+    "reproductionPairs": 11
+  }
+}

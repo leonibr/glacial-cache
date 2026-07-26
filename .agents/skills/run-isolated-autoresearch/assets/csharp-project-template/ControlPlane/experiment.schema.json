@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["experimentId", "workerId", "hypothesis", "candidateCommit", "parentBestCommit", "leaseExpiresAtUtc", "status"],
+  "properties": {
+    "experimentId": { "type": "string", "minLength": 1 },
+    "workerId": { "type": "string", "minLength": 1 },
+    "hypothesis": { "type": "string", "minLength": 1 },
+    "candidateCommit": { "type": "string", "minLength": 7 },
+    "parentBestCommit": { "type": "string", "minLength": 7 },
+    "leaseExpiresAtUtc": { "type": "string", "format": "date-time" },
+    "status": { "enum": ["queued", "leased", "submitted", "evaluating", "kept", "rejected", "invalid"] }
+  }
+}

@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 
-namespace GlacialCache.Logging;
+namespace GlacialCache.PostgreSQL.Logging;
 
 internal static partial class ResilienceOperations
 {

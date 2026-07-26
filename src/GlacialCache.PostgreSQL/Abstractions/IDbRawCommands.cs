@@ -2,6 +2,8 @@
 
 using Microsoft.Extensions.Caching.Distributed;
 
+namespace GlacialCache.PostgreSQL.Abstractions;
+
 internal interface IDbRawCommands : IDisposable
 {
     /// <summary>

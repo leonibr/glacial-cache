@@ -4,7 +4,7 @@ using GlacialCache.Abstractions;
 using MemoryPack;
 using Microsoft.Extensions.Caching.Distributed;
 
-namespace GlacialCache.Example.CacheEntryExample;
+namespace GlacialCache.Example.CacheEntry;
 
 // Model classes for demonstrating complex type caching
 

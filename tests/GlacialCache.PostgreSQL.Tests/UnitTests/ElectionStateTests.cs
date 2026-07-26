@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using GlacialCache.PostgreSQL.Logging;
 using GlacialCache.PostgreSQL.Models;
 using GlacialCache.PostgreSQL.Tests.Shared;
 using Microsoft.Extensions.Logging;

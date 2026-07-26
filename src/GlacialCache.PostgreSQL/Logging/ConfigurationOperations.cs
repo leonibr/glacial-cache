@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 
-namespace GlacialCache.Logging;
+namespace GlacialCache.PostgreSQL.Logging;
 
 /// <summary>
 /// Source-generated logging operations for configuration change detection.

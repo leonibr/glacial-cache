@@ -1,6 +1,6 @@
 using System.Threading;
 using Microsoft.Extensions.Logging;
-using GlacialCache.Logging;
+using GlacialCache.PostgreSQL.Logging;
 
 namespace GlacialCache.PostgreSQL.Models;
 

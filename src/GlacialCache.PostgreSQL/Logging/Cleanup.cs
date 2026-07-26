@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 
-namespace GlacialCache.Logging;
+namespace GlacialCache.PostgreSQL.Logging;
 
 public static partial class CleanupOperations
 {

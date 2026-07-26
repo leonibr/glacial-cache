@@ -5,7 +5,7 @@ using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace GlacialCache.Example.CacheEntryExample;
+namespace GlacialCache.Example.CacheEntry;
 
 class Program
 {

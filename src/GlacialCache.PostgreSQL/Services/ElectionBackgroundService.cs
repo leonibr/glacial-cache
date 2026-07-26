@@ -1,4 +1,4 @@
-using GlacialCache.Logging;
+using GlacialCache.PostgreSQL.Logging;
 using GlacialCache.PostgreSQL.Abstractions;
 using GlacialCache.PostgreSQL.Configuration;
 using GlacialCache.PostgreSQL.Configuration.Infrastructure;

@@ -1,4 +1,5 @@
 
+namespace GlacialCache.PostgreSQL.Logging;
 
 public static class LoggingIds
 {

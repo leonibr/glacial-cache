@@ -1,6 +1,6 @@
 ## ❄️ GlacialCache
 
-GlacialCache has one provider-neutral `GlacialCache.Abstractions.IGlacialCache` contract (also registered as `IDistributedCache`) with raw byte, rich `CacheEntry<T>`, typed MemoryPack, and batch operations. PostgreSQL remains available through `AddGlacialCachePostgreSQL`; SQL Server 2019+ is available through `AddGlacialCacheSqlServer` from the `GlacialCache.SqlServer` package. Provider switches do not require cache-facing API changes.
+GlacialCache has one provider-neutral `GlacialCache.Abstractions.IGlacialCache` contract (also registered as `IDistributedCache`) with raw byte, rich `CacheEntry<T>`, typed MemoryPack, and batch operations. PostgreSQL is available through `AddGlacialCachePostgreSQL`.
 
 **PostgreSQL-backed distributed caching for .NET** — reuse the database you already trust to get durable, cross-instance caching without adding new infrastructure.
 

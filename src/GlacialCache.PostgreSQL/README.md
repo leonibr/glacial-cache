@@ -286,6 +286,14 @@ var combinedOptions = new DistributedCacheEntryOptions
 
 ### Allocation-sensitive batch writes
 
+When an application always reads the same keys immediately after a batch write, use the combined workflow instead of awaiting separate calls:
+
+```csharp
+var values = await cache.SetAndGetMultipleAsync(entries, cancellationToken);
+```
+
+For up to 1000 entries, `SetAndGetMultipleAsync` commits the complete write batch before performing the read in one PostgreSQL command exchange. A write failure rolls back the full batch; a read failure occurs after the writes have committed. Larger inputs safely fall back to the existing chunked write followed by the batch read.
+
 The regular `SetMultipleAsync` overload for `ReadOnlyMemory<byte>` snapshots payloads and is the recommended default. When payload-copy allocations are a measured bottleneck, `SetMultipleDirectAsync` provides an explicit opt-in path:
 
 ```csharp

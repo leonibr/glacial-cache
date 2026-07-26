@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using NpgsqlTypes;
 using Polly;
 
 namespace GlacialCache.PostgreSQL;
@@ -795,6 +796,143 @@ public class GlacialCachePostgreSQL : IGlacialCache, IRuntimeConfigurationSubscr
         {
             throw;
         }
+    }
+
+    /// <summary>
+    /// Sets multiple cache entries, commits the writes, and then reads those keys.
+    /// Batches of up to 1000 entries complete in one PostgreSQL client/server exchange.
+    /// </summary>
+    public async Task<Dictionary<string, byte[]?>> SetAndGetMultipleAsync(
+        Dictionary<string, (byte[] value, DistributedCacheEntryOptions options)> entries,
+        CancellationToken token = default)
+    {
+        ThrowIfDisposed();
+
+        if (entries == null || entries.Count == 0)
+            return new Dictionary<string, byte[]?>();
+
+        ValidateKeys(entries.Keys);
+
+        const int maxBatchSize = 1000;
+        if (entries.Count > maxBatchSize)
+        {
+            await SetMultipleAsync(entries, token);
+            return await GetMultipleAsync(entries.Keys, token);
+        }
+
+        var keys = new string[entries.Count];
+        var values = new byte[entries.Count][];
+        var relativeExpirations = new TimeSpan?[entries.Count];
+        var slidingExpirations = new TimeSpan?[entries.Count];
+        var valueTypes = new string?[entries.Count];
+        var entryTimes = new DateTimeOffset[entries.Count];
+
+        var index = 0;
+        foreach (var entry in entries)
+        {
+            keys[index] = entry.Key;
+            values[index] = entry.Value.value;
+
+            var now = _timeProvider.GetUtcNow();
+            entryTimes[index] = now;
+
+            if (entry.Value.options.AbsoluteExpiration.HasValue)
+            {
+                relativeExpirations[index] = _timeConverter.ConvertToRelativeInterval(
+                    entry.Value.options.AbsoluteExpiration.Value,
+                    now);
+            }
+            else if (entry.Value.options.AbsoluteExpirationRelativeToNow.HasValue)
+            {
+                var relativeInterval = entry.Value.options.AbsoluteExpirationRelativeToNow.Value;
+                relativeExpirations[index] = relativeInterval <= TimeSpan.Zero
+                    ? TimeSpan.FromMilliseconds(1)
+                    : relativeInterval;
+            }
+            else if (_options.Cache.DefaultAbsoluteExpirationRelativeToNow.HasValue)
+            {
+                relativeExpirations[index] = _options.Cache.DefaultAbsoluteExpirationRelativeToNow.Value;
+            }
+
+            slidingExpirations[index] = entry.Value.options.SlidingExpiration
+                ?? _options.Cache.DefaultSlidingExpiration;
+            index++;
+        }
+
+        var result = new Dictionary<string, byte[]?>(entries.Count);
+        var setCommitted = false;
+
+        try
+        {
+            await using var connection = await _dataSource.GetConnectionAsync(token);
+            await using var batch = new NpgsqlBatch(connection);
+
+            batch.BatchCommands.Add(new NpgsqlBatchCommand("BEGIN"));
+
+            var setCommand = new NpgsqlBatchCommand(_dbRawCommands.SetMultipleBulkSql);
+            setCommand.Parameters.Add(new NpgsqlParameter
+            {
+                NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.Text,
+                Value = keys
+            });
+            setCommand.Parameters.Add(new NpgsqlParameter
+            {
+                NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.Bytea,
+                Value = values
+            });
+            setCommand.Parameters.Add(new NpgsqlParameter
+            {
+                NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.Interval,
+                Value = relativeExpirations
+            });
+            setCommand.Parameters.Add(new NpgsqlParameter
+            {
+                NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.Interval,
+                Value = slidingExpirations
+            });
+            setCommand.Parameters.Add(new NpgsqlParameter
+            {
+                NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.Text,
+                Value = valueTypes
+            });
+            setCommand.Parameters.Add(new NpgsqlParameter
+            {
+                NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.TimestampTz,
+                Value = entryTimes
+            });
+            batch.BatchCommands.Add(setCommand);
+
+            batch.BatchCommands.Add(new NpgsqlBatchCommand("COMMIT"));
+            batch.BatchCommands.Add(new NpgsqlBatchCommand("SELECT true AS write_committed"));
+
+            var readCommand = new NpgsqlBatchCommand(_dbRawCommands.GetMultipleSql);
+            readCommand.Parameters.AddWithValue("@keys", keys);
+            readCommand.Parameters.AddWithValue("@now", _timeProvider.GetUtcNow());
+            batch.BatchCommands.Add(readCommand);
+
+            await using var reader = await batch.ExecuteReaderAsync(token);
+            if (!await reader.ReadAsync(token) || !reader.GetBoolean(0))
+                throw new InvalidOperationException("The batch write commit could not be confirmed.");
+
+            _logger.LogBatchSetSuccess(entries.Count);
+            setCommitted = true;
+
+            if (!await reader.NextResultAsync(token))
+                throw new InvalidOperationException("The batch read result was not returned.");
+
+            while (await reader.ReadAsync(token))
+            {
+                result[reader.GetString(0)] = reader.GetFieldValue<byte[]>(1);
+            }
+        }
+        catch (Exception ex)
+        {
+            if (!setCommitted)
+                _logger.LogBatchSetError(entries.Count, ex);
+            throw;
+        }
+
+        return new Dictionary<string, byte[]?>(result);
     }
 
     /// <summary>

@@ -99,6 +99,10 @@ internal interface IDbRawCommands : IDisposable
     /// </summary>
     string SetMultipleSql { get; }
     /// <summary>
+    /// Gets the SQL for setting multiple keys from PostgreSQL arrays in one command.
+    /// </summary>
+    string SetMultipleBulkSql { get; }
+    /// <summary>
     /// Gets the SQL for removing multiple keys.
     /// <code>
     /// DELETE FROM {fullTableName} WHERE key = ANY(@keys)

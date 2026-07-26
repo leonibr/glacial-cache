@@ -129,6 +129,7 @@ internal sealed record DbSqlSnapshot(
     string CleanupExpiredSql,
     string GetMultipleSql,
     string SetMultipleSql,
+    string SetMultipleBulkSql,
     string RemoveMultipleSql,
     string RefreshMultipleSql);
 
@@ -146,6 +147,7 @@ internal static class RuntimeSqlBuilder
             BuildCleanupExpiredSql(fullTableName),
             BuildGetMultipleSql(fullTableName),
             BuildSetMultipleSql(fullTableName, defaultAbsoluteExpirationRelativeToNow),
+            BuildSetMultipleBulkSql(fullTableName, defaultAbsoluteExpirationRelativeToNow),
             BuildRemoveMultipleSql(fullTableName),
             BuildRefreshMultipleSql(fullTableName));
     }
@@ -252,6 +254,24 @@ internal static class RuntimeSqlBuilder
     private static string BuildSetMultipleSql(string fullTableName, TimeSpan? defaultAbsoluteExpirationRelativeToNow) => $@"
             INSERT INTO {fullTableName} (key, value, absolute_expiration, sliding_interval, value_type, next_expiration)
             VALUES ($1, $2, $6 + $3::interval, $4, $5, {GetNextExpirationForInsertPositional(defaultAbsoluteExpirationRelativeToNow, "$3", "$4", "$6")})
+            ON CONFLICT (key)
+            DO UPDATE SET
+                value = EXCLUDED.value,
+                absolute_expiration = EXCLUDED.absolute_expiration,
+                sliding_interval = EXCLUDED.sliding_interval,
+                next_expiration = EXCLUDED.next_expiration";
+
+    private static string BuildSetMultipleBulkSql(string fullTableName, TimeSpan? defaultAbsoluteExpirationRelativeToNow) => $@"
+            INSERT INTO {fullTableName} (key, value, absolute_expiration, sliding_interval, value_type, next_expiration)
+            SELECT
+                item.key,
+                item.value,
+                item.now + item.relative_expiration,
+                item.sliding_expiration,
+                item.value_type,
+                {GetNextExpirationForInsert(defaultAbsoluteExpirationRelativeToNow, "item.relative_expiration", "item.sliding_expiration", "item.now")}
+            FROM unnest($1::text[], $2::bytea[], $3::interval[], $4::interval[], $5::text[], $6::timestamptz[])
+                AS item(key, value, relative_expiration, sliding_expiration, value_type, now)
             ON CONFLICT (key)
             DO UPDATE SET
                 value = EXCLUDED.value,

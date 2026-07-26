@@ -29,6 +29,9 @@ public sealed class RuntimeConfigurationSnapshotTests
         snapshot.Cache.DefaultAbsoluteExpirationRelativeToNow.ShouldBe(TimeSpan.FromDays(3));
         snapshot.Cache.Sql.SetSql.ShouldContain("mixed_schema.mixed_table");
         snapshot.Cache.Sql.SetSql.ShouldContain("interval '3 days'");
+        snapshot.Cache.Sql.SetMultipleBulkSql.ShouldContain("mixed_schema.mixed_table");
+        snapshot.Cache.Sql.SetMultipleBulkSql.ShouldContain("unnest($1::text[], $2::bytea[]");
+        snapshot.Cache.Sql.SetMultipleBulkSql.ShouldContain("interval '3 days'");
         snapshot.Cache.Sql.GetSql.ShouldContain("mixed_schema.mixed_table");
 
         snapshot.Connection.ConnectionString.ShouldContain("Application Name=snapshot");
@@ -156,6 +159,8 @@ public sealed class RuntimeConfigurationSnapshotTests
         commands.SetSql.ShouldContain("after_schema.after_table");
         commands.SetSql.ShouldContain("interval '6 days'");
         commands.SetSql.ShouldNotContain("interval '2 days'");
+        commands.SetMultipleBulkSql.ShouldContain("after_schema.after_table");
+        commands.SetMultipleBulkSql.ShouldContain("interval '6 days'");
     }
 
     [Fact]

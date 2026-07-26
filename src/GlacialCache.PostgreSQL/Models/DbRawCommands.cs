@@ -118,6 +118,9 @@ internal sealed class DbRawCommands : IDbRawCommands, IRuntimeConfigurationSubsc
     /// </inheritdoc cref="IDbRawCommands.SetMultipleSql" />
     public string SetMultipleSql => Sql.SetMultipleSql;
 
+    /// <inheritdoc cref="IDbRawCommands.SetMultipleBulkSql" />
+    public string SetMultipleBulkSql => Sql.SetMultipleBulkSql;
+
     /// <inheritdoc cref="IDbRawCommands.RemoveMultipleSql" />
     public string RemoveMultipleSql => Sql.RemoveMultipleSql;
 

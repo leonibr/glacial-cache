@@ -22,6 +22,17 @@ public interface IGlacialCache : IDistributedCache
         CancellationToken token = default);
 
     /// <summary>
+    /// Sets multiple cache entries and then reads those keys after the writes commit.
+    /// For batches of up to 1000 entries, both operations use one PostgreSQL client/server exchange.
+    /// </summary>
+    /// <param name="entries">A dictionary of key-value pairs with their expiration options.</param>
+    /// <param name="token">Cancellation token.</param>
+    /// <returns>A dictionary containing the committed, unexpired entries. Missing keys will not be included.</returns>
+    Task<Dictionary<string, byte[]?>> SetAndGetMultipleAsync(
+        Dictionary<string, (byte[] value, DistributedCacheEntryOptions options)> entries,
+        CancellationToken token = default);
+
+    /// <summary>
     /// Sets multiple cache entries in a single database operation using PostgreSQL's batch functionality.
     /// Overload that snapshots ReadOnlyMemory<byte> values before PostgreSQL executes the batch.
     /// </summary>

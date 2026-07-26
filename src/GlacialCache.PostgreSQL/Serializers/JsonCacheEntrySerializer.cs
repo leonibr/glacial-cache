@@ -10,7 +10,7 @@ using Abstractions;
 /// JSON-based implementation of ICacheEntrySerializer using System.Text.Json with performance optimizations.
 /// Provides string optimization and high-performance JSON serialization for complex objects.
 /// </summary>
-public class JsonCacheEntrySerializer : ICacheEntrySerializer
+public class JsonCacheEntrySerializer : global::GlacialCache.Abstractions.ICacheEntrySerializer
 {
     private static readonly JsonSerializerOptions HighPerformanceOptions = new()
     {

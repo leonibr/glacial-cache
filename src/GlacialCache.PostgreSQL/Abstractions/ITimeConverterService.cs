@@ -3,7 +3,7 @@ namespace GlacialCache.PostgreSQL.Abstractions;
 /// <summary>
 /// Service for converting absolute expiration times to relative time intervals.
 /// </summary>
-public interface ITimeConverterService
+internal interface ITimeConverterService
 {
     /// <summary>
     /// Converts an absolute expiration time to a relative time interval from now.

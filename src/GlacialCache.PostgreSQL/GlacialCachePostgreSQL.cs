@@ -21,7 +21,7 @@ using Services;
 /// <summary>
 /// Enhanced PostgreSQL implementation of IDistributedCache with connection optimization.
 /// </summary>
-public class GlacialCachePostgreSQL : global::GlacialCache.Abstractions.IGlacialCache, GlacialCache.PostgreSQL.Abstractions.IGlacialCache, IRuntimeConfigurationSubscriber, IDisposable
+public class GlacialCachePostgreSQL : global::GlacialCache.Abstractions.IGlacialCache, IRuntimeConfigurationSubscriber, IDisposable
 {
     private readonly IDisposable _runtimeConfigurationSubscription;
     private readonly IRuntimeConfigurationPublisher? _ownedRuntimeConfigurationPublisher;

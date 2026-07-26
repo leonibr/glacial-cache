@@ -12,7 +12,7 @@ namespace GlacialCache.PostgreSQL.Tests.Shared;
 /// </summary>
 public static class CacheEntryTestHelper
 {
-    private static readonly CacheEntryHelper _memoryPackHelper = new(new GlacialCache.PostgreSQL.Serializers.MemoryPackCacheEntrySerializer());
+    private static readonly CacheEntryHelper _memoryPackHelper = new(new MemoryPackCacheEntrySerializer());
 
     private static readonly CacheEntryHelper _jsonHelper = new(new JsonCacheEntrySerializer());
     /// <summary>

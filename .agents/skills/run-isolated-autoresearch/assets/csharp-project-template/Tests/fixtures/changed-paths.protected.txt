@@ -1,2 +1,0 @@
-Candidate/Candidate.cs
-Evaluator/Evaluator.cs

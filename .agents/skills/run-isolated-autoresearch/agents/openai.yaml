@@ -1,4 +1,0 @@
-interface:
-  display_name: "Isolated Autoresearch"
-  short_description: "Run guarded, production-shaped improvement loops"
-  default_prompt: "Use $run-isolated-autoresearch to isolate a repository slice and build a guarded scored improvement loop."

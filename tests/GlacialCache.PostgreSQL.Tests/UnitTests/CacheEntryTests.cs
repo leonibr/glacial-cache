@@ -1,5 +1,6 @@
 using GlacialCache.PostgreSQL.Configuration;
 using GlacialCache.PostgreSQL.Models;
+using GlacialCache.Abstractions;
 using GlacialCache.PostgreSQL.Tests.Shared;
 using MemoryPack;
 

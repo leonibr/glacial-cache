@@ -4,6 +4,8 @@ using GlacialCache.PostgreSQL.Abstractions;
 using GlacialCache.PostgreSQL.Configuration;
 using GlacialCache.PostgreSQL.Extensions;
 using GlacialCache.PostgreSQL.Models;
+using GlacialCache.Abstractions;
+using IGlacialCache = GlacialCache.PostgreSQL.Abstractions.IGlacialCache;
 using GlacialCache.PostgreSQL.Services;
 using GlacialCache.PostgreSQL.Tests.Shared;
 using MemoryPack;
@@ -23,7 +25,7 @@ public sealed class ComprehensiveValidationTests : IntegrationTestBase
 {
     private PostgreSqlContainer? _postgres;
     private ServiceProvider? _serviceProvider;
-    private IGlacialCache? _glacialCache;
+    private GlacialCache.PostgreSQL.Abstractions.IGlacialCache? _glacialCache;
     private IDistributedCache? _distributedCache;
     private NpgsqlDataSource? _dataSource;
 

@@ -1,5 +1,6 @@
 using GlacialCache.PostgreSQL.Services;
 using GlacialCache.PostgreSQL.Models;
+using GlacialCache.Abstractions;
 using GlacialCache.PostgreSQL.Abstractions;
 using GlacialCache.PostgreSQL.Configuration;
 using GlacialCache.PostgreSQL.Serializers;
@@ -11,7 +12,7 @@ namespace GlacialCache.PostgreSQL.Tests.Shared;
 /// </summary>
 public static class CacheEntryTestHelper
 {
-    private static readonly CacheEntryHelper _memoryPackHelper = new(new MemoryPackCacheEntrySerializer());
+    private static readonly CacheEntryHelper _memoryPackHelper = new(new GlacialCache.PostgreSQL.Serializers.MemoryPackCacheEntrySerializer());
 
     private static readonly CacheEntryHelper _jsonHelper = new(new JsonCacheEntrySerializer());
     /// <summary>
@@ -122,4 +123,3 @@ public static class CacheEntryTestHelper
         };
     }
 }
-
